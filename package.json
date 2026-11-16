@@ -1,0 +1,6 @@
+{
+  "name": "daxator-packages",
+  "private": true,
+  "type": "module",
+  "description": "Daxator Studios packages, quotes, invoices and agreements"
+}

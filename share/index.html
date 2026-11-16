@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#F7F3EE">
+<title>Video Packages · Daxator Studios</title>
+<meta name="description" content="Restaurant reels, shot on-site and delivered in 24 hours. See our plans.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Video Packages · Daxator Studios">
+<meta property="og:description" content="Restaurant reels, shot on-site and delivered in 24 hours. Tap to see our plans.">
+<meta property="og:image" content="https://daxator-packages.vercel.app/assets/og-share.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="/assets/base.css">
+<style>
+.wrap{max-width:1180px;margin:0 auto;padding:22px 18px 60px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.top img{height:40px}
+.hero{text-align:center;padding:38px 0 20px}
+.hero .lbl{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--brown2)}
+.hero h1{font-family:var(--serif);font-weight:700;font-size:clamp(28px,5vw,48px);line-height:1.08;letter-spacing:.02em;margin:10px 0 0}
+.hero p{color:var(--muted);font-size:clamp(15px,1.6vw,17px);margin:12px auto 0;max-width:560px;line-height:1.55}
+.note{max-width:620px;margin:20px auto 0;border-radius:18px;padding:16px 18px;font-size:15px;line-height:1.55;text-align:left}
+.note b{font-family:var(--serif);display:block;font-size:13px;letter-spacing:.06em;color:var(--brown2);margin-bottom:2px}
+.usps{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:18px}
+.usp{font-size:12.5px;font-weight:700;border-radius:99px;padding:8px 14px}
+.usp b{color:var(--brown2)}
+.term{display:flex;justify-content:center;margin:26px 0 8px}
+.term .seg button{padding:10px 18px;font-size:14px}
+.bonus{display:flex;gap:10px;align-items:center;justify-content:center;max-width:620px;margin:10px auto 0;padding:12px 16px;border-radius:16px;border:1px dashed var(--brown2);color:var(--brown);background:rgba(255,248,240,.6);font-size:14px;text-align:center}
+.grid{display:grid;gap:18px;margin-top:22px;grid-template-columns:1fr}
+@media(min-width:720px){.grid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1060px){.grid.n3{grid-template-columns:repeat(3,1fr)}}
+.pk{position:relative;border-radius:26px;padding:26px 22px 22px;display:flex;flex-direction:column;opacity:0;animation:rise .8s var(--ease) forwards;transition:transform .45s var(--spring),box-shadow .45s}
+.pk:hover{transform:translateY(-6px);box-shadow:var(--sh-lg)}
+.pk.rec{background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,250,244,.78));border:1.5px solid rgba(74,52,38,.55)}
+.pk .tag{position:absolute;top:-12px;left:22px;background:var(--brown);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:6px 11px;border-radius:99px}
+.pk h3{font-family:var(--serif);font-size:23px;letter-spacing:.04em;margin:0}
+.pk .for{color:var(--muted);font-size:14px;margin-top:3px}
+.pk .price{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:18px 0 2px}
+.pk .now{font-size:34px;font-weight:800;letter-spacing:-.03em}
+.pk .per{color:var(--muted);font-size:14px}
+.pk s{color:var(--muted);font-size:15px}
+.pk .pr{font-size:12.5px;font-weight:700;color:var(--brown2)}
+.pk .save{font-size:12.5px;font-weight:700;color:var(--green);margin-top:3px;min-height:18px}
+.pk .why{margin:14px 0 0;font-size:14px;line-height:1.55;background:var(--tint);border-radius:14px;padding:12px 14px}
+.pk ul{list-style:none;padding:0;margin:16px 0 0;display:grid;gap:9px;flex:1}
+.pk li{display:flex;gap:10px;font-size:14.5px;line-height:1.35}
+.pk li::before{content:"";flex:none;width:18px;height:18px;border-radius:50%;background:var(--tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8.2l2.2 2.2 4.8-4.8' fill='none' stroke='%234A3426' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat}
+.pk .btn{margin-top:20px}
+.how{display:grid;gap:12px;margin-top:40px;grid-template-columns:1fr}
+@media(min-width:900px){.how{grid-template-columns:1.5fr 1fr}}
+.steps{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+.step{border-radius:16px;padding:14px;display:flex;gap:12px;align-items:flex-start}
+.step .n{font-family:var(--serif);font-weight:700;width:32px;height:32px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--tint);color:var(--brown)}
+.step b{display:block;font-size:14px}.step span{font-size:12.5px;color:var(--muted)}
+.box{border-radius:22px;padding:20px}
+.promise{text-align:center;background:linear-gradient(140deg,rgba(255,255,255,.75),rgba(244,232,220,.7))}
+.promise .serif{font-size:19px;color:var(--brown)}
+.promise p{color:var(--muted);margin:6px 0 0;font-size:14px}
+.cta{margin-top:30px;border-radius:26px;padding:28px 22px;text-align:center;background:linear-gradient(140deg,#3E2C20,#5B4231);color:#FBF3EA;box-shadow:0 24px 50px -24px rgba(62,44,32,.8)}
+.cta h2{font-family:var(--serif);font-size:clamp(22px,3vw,30px);margin:0;letter-spacing:.03em}
+.cta p{color:#E5D3C1;margin:8px 0 18px}
+.cta .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.cta .btn{min-width:200px;height:50px}
+.btn.wa{background:#25D366;border-color:#25D366;color:#06301A}
+.valid{text-align:center;color:var(--muted);font-size:12.5px;margin-top:22px}
+.err{max-width:460px;margin:80px auto;text-align:center;border-radius:24px;padding:30px}
+.err h2{font-family:var(--serif)}
+.lead{text-align:center;font-family:var(--serif);font-size:13px;letter-spacing:.14em;color:var(--brown2);margin-top:34px}
+</style>
+</head>
+<body>
+<div class="bgfx"><i></i><i></i><i></i></div><div class="grain"></div>
+<div class="wrap" id="app"></div>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const r500=n=>Math.round(n/500)*500, rs=n=>'Rs '+Math.round(n).toLocaleString('en-US');
+const waNum=p=>{let n=String(p||'').replace(/\D/g,'');if(n.startsWith('00'))n=n.slice(2);if(n.startsWith('0'))n='92'+n.slice(1);return n};
+function unb64(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
+async function decode(code){const kind=code[0],bytes=unb64(code.slice(1));
+  if(kind==='z'){const ds=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));return JSON.parse(await new Response(ds).text())}
+  return JSON.parse(new TextDecoder().decode(bytes))}
+function fail(msg){$('app').innerHTML=`<div class="err glass"><img src="/assets/logo.png" style="height:44px" alt=""><h2>Link not available</h2><p class="muted">${msg}</p></div>`}
+
+let D=null,three=false;
+function card(p,i){const on3=three&&p.m&&D.d>0,now=on3?r500(p.p*(1-D.d/100)):p.p;
+  const wa=`https://wa.me/${waNum(D.b.p)}?text=${encodeURIComponent(`Hi! I'm interested in the ${p.n} ${p.m?'plan':'shoot'}${D.c?' for '+D.c:''}. Can we talk?`)}`;
+  return `<article class="pk glass ${p.r?'rec':''}" style="animation-delay:${.15+i*.08}s">${p.r?'<span class="tag">Most chosen</span>':''}${p.m?'':'<span class="tag" style="background:var(--ink)">Pay once</span>'}
+    <h3>${esc(p.n)}</h3><div class="for">${esc(p.g)}</div>
+    <div class="price"><span class="now">${rs(now)}</span><span class="per">${p.m?'/ month':'one time'}</span>${on3?`<s>${rs(p.p)}</s>`:''}</div>
+    <div class="pr">${rs(p.pr)} per reel</div><div class="save">${on3?`${rs(now*3)} for 3 months · save ${rs((p.p-now)*3)}`:''}</div>
+    ${p.w?`<p class="why">${esc(p.w)}</p>`:''}
+    <ul>${(p.it||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+    <a class="btn ${p.r?'dark':''} full" href="${wa}" target="_blank" rel="noopener">I’m interested →</a></article>`}
+function render(){
+  const mon=D.pk.filter(p=>p.m),one=D.pk.filter(p=>!p.m),exp=D.t+D.vd*864e5,first=(D.b.o||'').split(' ')[0];
+  const wa=`https://wa.me/${waNum(D.b.p)}?text=${encodeURIComponent(`Hi ${first||''}! I saw your video packages${D.c?' for '+D.c:''} and I'd like to book a free trial reel.`)}`;
+  $('app').innerHTML=`
+  <div class="top"><img src="/assets/logo.png" alt="${esc(D.b.n)}"><a class="btn sm" href="${wa}" target="_blank" rel="noopener">Contact us</a></div>
+  <div class="hero stagger"><div class="lbl">${D.c?'Prepared for '+esc(D.c):'Video packages'}</div>
+    <h1>Reels that sell<br>your food</h1>
+    <p>We come to your place, shoot your dishes and deliver every reel within 24 hours. Pick the plan that fits you.</p>
+    <div class="usps"><span class="usp glass"><b>◆</b> We come to you</span><span class="usp glass"><b>◆</b> 24h delivery</span><span class="usp glass"><b>◆</b> Late = free reel</span></div>
+    ${D.n?`<div class="note glass"><b>A NOTE FROM ${esc((D.b.o||D.b.n).toUpperCase())}</b>${esc(D.n).replace(/\n/g,'<br>')}</div>`:''}</div>
+  ${D.d>0&&mon.length?`<div class="term"><div class="seg glass" id="term"><button data-t="1" class="${three?'':'on'}">Monthly</button><button data-t="3" class="${three?'on':''}">3 months · save ${D.d}%</button></div></div>`:''}
+  ${D.bonus?`<div class="bonus"><b class="serif">Bonus</b> ${esc(D.bonus)}</div>`:''}
+  ${mon.length?`<div class="grid ${mon.length>=3?'n3':''}" id="gm">${mon.map(card).join('')}</div>`:''}
+  ${one.length?`<div class="lead">— OR JUST ONCE —</div><div class="grid" id="go">${one.map((p,i)=>card(p,i+mon.length)).join('')}</div>`:''}
+  <div class="how"><div class="box glass"><div class="lbl" style="font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--brown2);margin-bottom:12px">HOW IT WORKS</div>
+    <div class="steps"><div class="step glass"><span class="n">1</span><div><b>Free trial reel</b><span>We shoot one dish, delivered the same day.</span></div></div>
+    <div class="step glass"><span class="n">2</span><div><b>Pick a plan</b><span>Choose what fits your page.</span></div></div>
+    <div class="step glass"><span class="n">3</span><div><b>Pay the advance</b><span>${D.adv?D.adv+'% to start, ':''}shoots booked the same week.</span></div></div>
+    <div class="step glass"><span class="n">4</span><div><b>We shoot, you post</b><span>Reels in 24 hours. Every time.</span></div></div></div></div>
+    <div class="box glass promise"><div class="serif">The Speed Promise</div><p>If a reel is late, that reel is free.</p><p style="margin-top:12px">2 revisions per reel · Raw footage on request · Cancel anytime after your plan</p></div></div>
+  <div class="cta"><h2>Let’s make your food the star</h2><p>Start with a free trial reel. No commitment.</p>
+    <div class="row"><a class="btn wa" href="${wa}" target="_blank" rel="noopener">Message on WhatsApp</a><a class="btn" href="tel:${esc(String(D.b.p).replace(/[^\d+]/g,''))}">Call ${esc(D.b.p)}</a></div></div>
+  <div class="valid">Prices valid until ${new Date(exp).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} · ${esc(D.b.n)}</div>`;
+  const t=$('term');if(t)t.onclick=e=>{const b=e.target.closest('[data-t]');if(!b)return;three=b.dataset.t==='3';
+    const y=scrollY;render();scrollTo(0,y);document.querySelectorAll('.pk').forEach(p=>{p.style.animation='none';p.style.opacity=1});document.querySelector('.hero').classList.remove('stagger')};
+}
+(async()=>{
+  const code=location.hash.slice(1);
+  if(!code){fail('This link looks incomplete. Please ask us to send it again.');return}
+  try{D=await decode(code)}catch(e){fail('This link looks damaged. Please ask us to send it again.');return}
+  if(!D||!Array.isArray(D.pk)||!D.pk.length){fail('No packages in this link.');return}
+  if(Date.now()>D.t+D.vd*864e5){fail(`These prices have expired. Message ${esc(D.b&&D.b.n||'us')} for an updated link.`);return}
+  document.title=(D.c?D.c+' · ':'')+'Video Packages · '+D.b.n;
+  render();
+})();
+</script>
+</body>
+</html>
