@@ -380,24 +380,25 @@ const cliBy=id=>st.clients.find(c=>c.id===id);
 let selCli=null,cQuery='';
 const wide=()=>matchMedia('(min-width:1180px)').matches;
 function vClients(){
-  const inv=st.docs.filter(d=>d.type==='invoice'),billed=inv.reduce((a,d)=>a+inPKR(d,d.money.total),0),got=inv.reduce((a,d)=>a+inPKR(d,recv(d)),0);
+  const inv=st.docs.filter(d=>d.type==='invoice'||isUp(d)),upN=inv.filter(isUp).length,billed=inv.reduce((a,d)=>a+inPKR(d,d.money.total),0),
+    got=inv.reduce((a,d)=>a+pays(d).reduce((x,p)=>x+inPKR(d,p.a),0),0),due=inv.reduce((a,d)=>a+inPKR(d,dueOf(d)),0);
   const q=cQuery.toLowerCase();
   const list=st.clients.filter(c=>!q||[c.biz,c.person,c.phone].join(' ').toLowerCase().includes(q)).sort((a,b)=>{
     const la=st.docs.find(d=>d.clientId===a.id)?.created||a.created||'',lb=st.docs.find(d=>d.clientId===b.id)?.created||b.created||'';return lb.localeCompare(la)});
   if(wide()&&!selCli&&list.length)selCli=list[0].id;
   return `<div class="ph"><div><h1>Clients</h1><p>Invoices, agreements and payments in one place.</p></div><div class="acts">
     <button class="btn" data-act="new-agreement">${ic('edit')}New agreement</button><button class="btn" data-act="new-custom">${ic('edit')}Custom invoice</button><button class="btn dark" data-act="new-invoice">${ic('doc')}New invoice</button></div></div>
-  <div class="stats stagger"><div class="stat glass"><small>Invoices</small><b data-cu="${inv.length}" data-n="1">${inv.length}</b></div><div class="stat glass"><small>Billed</small><b data-cu="${billed}">${rs(billed)}</b></div>
-    <div class="stat glass"><small>Received</small><b data-cu="${got}">${rs(got)}</b></div><div class="stat hl glass"><small>Due</small><b data-cu="${billed-got}">${rs(billed-got)}</b></div></div>
+  <div class="stats stagger"><div class="stat glass"><small>Invoices${upN?' + Upwork':''}</small><b data-cu="${inv.length}" data-n="1">${inv.length}</b>${upN?`<span class="alt">${inv.length-upN} invoices · ${upN} Upwork</span>`:''}</div><div class="stat glass"><small>Billed</small><b data-cu="${billed}">${rs(billed)}</b>${upN?'<span class="alt">incl. what Upwork clients paid</span>':''}</div>
+    <div class="stat glass"><small>Received</small><b data-cu="${got}">${rs(got)}</b>${upN?'<span class="alt">incl. Upwork, after fees</span>':''}</div><div class="stat hl glass"><small>Due</small><b data-cu="${due}">${rs(due)}</b></div></div>
   <p class="muted" style="font-size:12.5px;margin:-6px 0 12px">Next invoice: <b>${nextInv()}</b> · Next agreement: <b>${nextAgr()}</b> · Amounts in PKR</p>
   <div class="split"><div>
     <div class="toolbar"><div class="search">${ic('search')}<input class="in" id="cQ" placeholder="Search clients…" value="${esc(cQuery)}"></div></div>
     <div class="stagger" id="clList">${list.length?list.map(c=>cliRow(c)).join(''):`<div class="empty glass card"><b>${st.clients.length?'No match':'No clients yet'}</b>${st.clients.length?'':'Create an invoice or agreement and the client is saved here.'}</div>`}</div>
   </div>${wide()?`<div class="detail glass" id="cDet">${selCli&&cliBy(selCli)?cliDetail(cliBy(selCli)):'<div class="empty"><b>Pick a client</b>Their invoices and agreements show here.</div>'}</div>`:''}</div>`}
-function cliRow(c){const ds=st.docs.filter(d=>d.clientId===c.id),iv=ds.filter(d=>d.type==='invoice'),b=iv.reduce((a,d)=>a+inPKR(d,d.money.total),0),g=iv.reduce((a,d)=>a+inPKR(d,recv(d)),0);
+function cliRow(c){const ds=st.docs.filter(d=>d.clientId===c.id),iv=ds.filter(d=>d.type==='invoice'),mo=ds.filter(d=>d.type==='invoice'||isUp(d)),b=mo.reduce((a,d)=>a+inPKR(d,d.money.total),0),due=mo.reduce((a,d)=>a+inPKR(d,dueOf(d)),0);
   return `<div class="cl glass ${wide()&&selCli===c.id?'on':''}" data-cl="${c.id}"><span class="av">${esc((c.biz||'?').trim().charAt(0).toUpperCase())}</span>
    <div class="grow"><b>${esc(c.biz)}</b><small>${[iv.length?iv.length+' invoice'+(iv.length===1?'':'s'):'',ds.filter(d=>d.type==='agreement').length?ds.filter(d=>d.type==='agreement').length+' agreement'+(ds.filter(d=>d.type==='agreement').length===1?'':'s'):'',ds.filter(isUp).length?ds.filter(isUp).length+' Upwork':''].filter(Boolean).join(' · ')||'No documents'}${c.person?' · '+esc(c.person):''}</small></div>
-   ${b-g>0.5?`<span class="pill due">Due ${rs(b-g)}</span>`:b?'<span class="pill paid">Paid up</span>':''}</div>`}
+   ${due>0.5?`<span class="pill due">Due ${rs(due)}</span>`:b?'<span class="pill paid">Paid up</span>':''}</div>`}
 function cliDetail(c){const ds=st.docs.filter(d=>d.clientId===c.id);
   return `<div class="row"><span class="av" style="width:52px;height:52px;font-size:20px">${esc((c.biz||'?').charAt(0).toUpperCase())}</span><div class="grow"><h2>${esc(c.biz)}</h2><div class="muted" style="font-size:13.5px">${[c.person,c.phone,c.email].filter(Boolean).map(esc).join(' · ')||'No contact details yet'}</div></div></div>
   <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn dark sm" data-ci="${c.id}">${ic('doc')}New invoice</button><button class="btn sm" data-cc="${c.id}">${ic('edit')}Custom invoice</button><button class="btn sm" data-ca="${c.id}">${ic('edit')}New agreement</button><button class="btn sm" data-cq="${c.id}">Quote</button>
