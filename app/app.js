@@ -832,7 +832,7 @@ function vSettings(){
     <div class="g2">${f('costs.editor','Editor per reel','number')}${f('costs.travel','Travel per shoot','number')}${f('costs.photo','Photo edit per photo','number')}${f('costs.film','Ad film edit','number')}</div></section>
 
   <section class="sc glass" id="s-data"><h3>Data &amp; backup</h3><p class="muted">Your records are saved in this browser. Download a backup often, and use Restore to move them to another device.</p>
-    <div class="row" style="flex-wrap:wrap;margin-top:10px"><button class="btn" id="bk">${ic('down')}Download backup</button><button class="btn" id="rs">${ic('up')}Restore backup</button>
+    <div class="row" style="flex-wrap:wrap;margin-top:10px"><button class="btn" id="bk">${ic('down')}Download backup</button><button class="btn" id="rs">${ic('up')}Restore / import</button>
       <button class="btn" id="csvT">Trials CSV</button><button class="btn" id="csvI">Invoices CSV</button><button class="btn" id="wImp">Import walk-ins</button></div>
     <input type="file" id="rsF" accept=".json,application/json" class="hidden"><input type="file" id="wF" accept=".json,application/json" class="hidden">
     <button class="btn sm ghost danger" id="pkReset" style="margin-top:12px">Reset packages &amp; prices to default</button></section>
@@ -888,11 +888,12 @@ function wSettings(){
       if(Array.isArray(o)){importWalk(o);return}if(!o||typeof o!=='object')throw 0;
       const useS=(o.pk||o.biz||o.tpl)?await ask('Restore backup','Add the records from this backup. Also use its settings (prices, business details, template)?',[{label:'Records only',value:false},{label:'Records + settings',value:true,cls:'dark'}]):false;
       if(useS===null)return;
-      const add=(key)=>{const ids=new Set(st[key].map(x=>x.id));let n=0;(o[key]||[]).forEach(x=>{if(x&&x.id&&!ids.has(x.id)){st[key].push(key==='trials'?{...x,pkg:OLDMAP[x.pkg]||x.pkg||''}:x);n++}});return n};
-      const n=add('trials')+add('clients')+add('docs');
+      const {n,moved,dupe}=mergeRecords(o);
       if(useS){applyData({...o,trials:null,clients:null,docs:null},true)}
       if(o.biz){['invNext','agrNext'].forEach(k=>{if(+o.biz[k]>st.biz[k])st.biz[k]=+o.biz[k]})}
-      migrate();save();newDraft();render();drawNav();toast('Restored '+n+' records'+(useS?' + settings':'')+' ✓',3000)}catch(er){toast('That isn’t a valid backup file')}};rd.readAsText(fl);e.target.value=''};
+      migrate();save();newDraft();render();drawNav();toast((n?'Added '+n+' records':'Nothing new to add')+(useS?' + settings':'')+' ✓',3500);
+      if(moved.length)await ask('Invoice numbers updated','These invoices had the same number as an older one, so they moved to the next free number:<br><br><b>'+moved.map(esc).join('<br>')+'</b>',[{label:'OK',value:1,cls:'dark'}]);
+      else if(dupe&&!n)toast('These records are already in the app',3000)}catch(er){console.warn(er);toast('That isn’t a valid backup file')}};rd.readAsText(fl);e.target.value=''};
   $('wImp').onclick=()=>$('wF').click();
   $('wF').onchange=e=>{const fl=e.target.files[0];if(!fl)return;const rd=new FileReader();rd.onload=()=>{try{const w=JSON.parse(rd.result);if(!Array.isArray(w))throw 0;importWalk(w)}catch(er){toast('That isn’t a walk-in backup file')}};rd.readAsText(fl);e.target.value=''};
   const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
@@ -900,6 +901,21 @@ function wSettings(){
     dl(today()+'-trial-shoots.csv','﻿'+[cols.join(',')].concat(st.trials.map(r=>cols.map(k=>q(k==='status'?SL[r.status]:k==='pkg'?(pkBy(r.pkg)?.name||''):r[k])).join(','))).join('\n'),'text/csv')};
   $('csvI').onclick=exportInvCsv;
 }
+
+/* ---------- merge a backup / import file into this device ---------- */
+function mergeRecords(o){let n=0,dupe=0;const idMap={};
+  const tids=new Set(st.trials.map(t=>t.id));(o.trials||[]).forEach(x=>{if(!x||!x.id)return;if(tids.has(x.id)){dupe++;return}st.trials.push({...x,pkg:OLDMAP[x.pkg]||x.pkg||''});n++});
+  (o.clients||[]).forEach(c=>{if(!c||!c.id)return;if(cliBy(c.id)){dupe++;return}
+    const ex=st.clients.find(x=>String(x.biz||'').trim().toLowerCase()===String(c.biz||'').trim().toLowerCase());
+    if(ex){idMap[c.id]=ex.id;['person','phone','email','addr','ntn','source'].forEach(k=>{if(!ex[k]&&c[k])ex[k]=c[k]})}else{st.clients.push(c);n++}});
+  const dids=new Set(st.docs.map(d=>d.id));
+  (o.docs||[]).forEach(d=>{if(!d||!d.id)return;if(dids.has(d.id)){dupe++;return}if(idMap[d.clientId])d.clientId=idMap[d.clientId];st.docs.push(d);n++});
+  // same number used twice: the older document keeps it, the newer one moves to the next free number
+  const moved=[];
+  ['invoice','agreement'].forEach(type=>{const by={};st.docs.filter(d=>d.type===type&&d.no).forEach(d=>{const k=String(d.no).trim().toUpperCase();(by[k]=by[k]||[]).push(d)});
+    Object.values(by).filter(a=>a.length>1).forEach(a=>{a.sort((x,y)=>(x.date||'').localeCompare(y.date||'')||(x.created||'').localeCompare(y.created||''));
+      a.slice(1).forEach(d=>{const old=d.no;d.no=type==='invoice'?nextInv():nextAgr();moved.push(old+' → '+d.no+' · '+d.client.biz+(d.plan&&d.plan.name?' ('+d.plan.name+')':''))})})});
+  return{n,moved,dupe}}
 
 /* =================== START =================== */
 const h=location.hash.slice(1);if(VIEWS.some(v=>v[0]===h))view=h;
