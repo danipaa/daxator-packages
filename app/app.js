@@ -405,7 +405,7 @@ function cliDetail(c){const ds=st.docs.filter(d=>d.clientId===c.id);
   <details style="margin-top:14px"><summary class="lbl" style="cursor:pointer">Client details</summary>
     <div class="g2"><label class="fld"><span>Business</span><input class="in" data-cf="biz" value="${esc(c.biz)}"></label><label class="fld"><span>Contact person</span><input class="in" data-cf="person" value="${esc(c.person||'')}"></label>
     <label class="fld"><span>Phone</span><input class="in" data-cf="phone" value="${esc(c.phone||'')}"></label><label class="fld"><span>Email</span><input class="in" data-cf="email" value="${esc(c.email||'')}"></label></div>
-    <label class="fld"><span>Address</span><input class="in" data-cf="addr" value="${esc(c.addr||'')}"></label>
+    <div class="g2"><label class="fld"><span>Address</span><input class="in" data-cf="addr" value="${esc(c.addr||'')}"></label><label class="fld"><span>NTN</span><input class="in" data-cf="ntn" value="${esc(c.ntn||'')}"></label></div>
     <div class="row" style="margin-top:12px"><button class="btn sm dark" data-csave="${c.id}">Save details</button><button class="btn sm danger" data-cdel="${c.id}">${ic('trash')}Delete client</button></div></details>
   <div class="secl">Documents</div>
   <div class="doclist">${ds.length?ds.map(d=>{const inv=d.type==='invoice',T=d.money.total;return `<div class="dc"><div class="row"><b class="grow">${esc(d.no)} <span class="muted" style="font-weight:600;font-size:13px">${inv?(d.kind==='custom'?'Custom invoice':'Invoice'):'Agreement'}</span></b><span class="pill ${d.status}">${DSL[d.status]}</span></div>
@@ -479,7 +479,8 @@ function openDoc(o={}){
     <label class="fld"><span>Business / client name *</span><input class="in" id="dBiz" list="dTrials" autocomplete="off" placeholder="e.g. Coffmo"></label>
     <datalist id="dTrials">${st.trials.map(t=>`<option value="${esc(t.place)}">`).join('')}</datalist>
     <div class="g2"><label class="fld"><span>Contact person</span><input class="in" id="dPer"></label><label class="fld"><span>Phone</span><input class="in" id="dPh" type="tel"></label>
-    <label class="fld"><span>Email</span><input class="in" id="dEm" type="email"></label><label class="fld"><span>Address</span><input class="in" id="dAd"></label></div>
+    <label class="fld"><span>Email</span><input class="in" id="dEm" type="email"></label><label class="fld"><span>Address</span><input class="in" id="dAd"></label>
+    <label class="fld"><span>Client NTN (optional)</span><input class="in" id="dNtn" placeholder="Their tax number, if they need it on the invoice"></label></div>
     <div class="secl">Details</div>
     <div class="g2"><label class="fld"><span>Date</span><input class="in" id="dDate" type="date"></label>
       <label class="fld" id="fNo"><span>Invoice no.</span><input class="in" id="dNo" autocomplete="off"><small class="hint" id="dNoH"></small></label>
@@ -497,7 +498,7 @@ function openDoc(o={}){
   const b=m.body;
   // fill
   $('dCli').value=editing?editing.clientId:(o.clientId||'');
-  const setCli=c=>{$('dBiz').value=c?.biz||'';$('dPer').value=c?.person||'';$('dPh').value=c?.phone||'';$('dEm').value=c?.email||'';$('dAd').value=c?.addr||''};setCli(cli);
+  const setCli=c=>{$('dBiz').value=c?.biz||'';$('dPer').value=c?.person||'';$('dPh').value=c?.phone||'';$('dEm').value=c?.email||'';$('dAd').value=c?.addr||'';$('dNtn').value=c?.ntn||''};setCli(cli);
   $('dDate').value=editing?editing.date:t0;$('dDue').value=editing?(editing.due||''):addDays(t0,+st.biz.due||3);$('dStart').value=editing?(editing.start||''):addDays(t0,1);
   $('dNotes').value=editing?.notes||'';$('dPkg').value=D.pkg;$('dPeriod').value=editing?.period||'';$('dTitle').value=editing?.title||'';
   $('dDisc').value=D.disc||'';$('dTax').value=D.taxp||'';$('dAdv').value=D.adv;$('dFx').value=editing?fxOf(editing):(+st.biz.fx||280);
@@ -518,7 +519,7 @@ function openDoc(o={}){
     const inv=D.type==='invoice';
     return{type:D.type,kind:cust()?'custom':'package',plan:p,term,money:M,currency:cust()?D.cur:'PKR',fx:Math.max(1,+$('dFx').value||+st.biz.fx||280),
       lines:cust()?D.lines.filter(l=>String(l.desc||'').trim()||+l.rate).map(l=>({desc:String(l.desc||'').trim(),qty:+l.qty||0,rate:+l.rate||0})):null,title:cust()?$('dTitle').value.trim():'',
-      client:{biz:$('dBiz').value.trim(),person:$('dPer').value.trim(),phone:$('dPh').value.trim(),email:$('dEm').value.trim(),addr:$('dAd').value.trim()},
+      client:{biz:$('dBiz').value.trim(),person:$('dPer').value.trim(),phone:$('dPh').value.trim(),email:$('dEm').value.trim(),addr:$('dAd').value.trim(),ntn:$('dNtn').value.trim()},
       date,due:$('dDue').value,start:$('dStart').value||date,period:cust()?$('dPeriod').value.trim():($('dPeriod').value.trim()||periodOf(p,term,date)),status:D.status,
       advOn:inv&&D.status!=='unpaid'&&M.upPct>0&&M.upPct<100?($('dAdvOn').value||(D.status==='advance'?date:'')):'',paidOn:inv&&D.status==='paid'?($('dPaidOn').value||date):'',
       notes:$('dNotes').value.trim(),no:D.type==='invoice'?$('dNo').value.trim().toUpperCase():D.type==='agreement'?$('dANo').value.trim().toUpperCase():''}}
@@ -705,7 +706,7 @@ function vSettings(){
   <div class="stabs">${[['s-biz','Business'],['s-pk','Packages'],['s-price','Pricing'],['s-doc','Documents'],['s-cost','My costs'],['s-data','Data'],['s-acc','Account']].map(([a,l])=>`<button class="chip" data-go="${a}">${l}</button>`).join('')}</div>
   <div class="sgrid">
   <section class="sc glass" id="s-biz"><h3>My business</h3><p class="muted">Shown on invoices, quotes and agreements.</p>
-    <div class="g2">${f('biz.name','Business name')}${f('biz.owner','Owner name')}${f('biz.ntn','NTN number','text','placeholder="Add when you have it"')}${f('biz.phone','Phone / WhatsApp','tel')}${f('biz.email','Email','email')}${f('biz.addr','Address')}</div>
+    <div class="g2">${f('biz.name','Business name')}${f('biz.owner','Owner name')}${f('biz.ntn','Your NTN number','text','placeholder="Shows on every invoice, quote and agreement"')}${f('biz.phone','Phone / WhatsApp','tel')}${f('biz.email','Email','email')}${f('biz.addr','Address')}</div>
     <label class="fld"><span>Payment details (bank, account title, IBAN)</span><textarea class="in" data-d="biz.pay" placeholder="Bank: …&#10;Account title: …&#10;IBAN: …">${esc(B.pay)}</textarea></label>
     <div class="g3">${f('biz.upfront','Advance %','number')}${f('biz.tax','Sales tax %','number')}${f('biz.due','Balance due (days)','number')}</div>
     <div class="g2">${f('biz.invNext','Start invoice numbers from','number','min="1"')}${f('biz.agrNext','Start agreement numbers from','number','min="1"')}</div>

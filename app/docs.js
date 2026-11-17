@@ -96,7 +96,7 @@ function mk(ctx){
     return `<div class="dh">${lg}<div><div class="dt">${title}</div><div class="dm">${meta}</div></div></div>${T.header==='minimal'?'<div class="bar"></div>':''}`;
   }
   const fromB=()=>`<div class="lbl">From</div><b>${esc(B.name)}</b><br>${esc(B.owner)}${B.ntn?'<br>NTN: '+esc(B.ntn):''}${B.phone?'<br>'+esc(B.phone):''}${B.email?'<br>'+esc(B.email):''}${B.addr?'<br>'+esc(B.addr):''}`;
-  const toB=(c,l)=>`<div class="lbl">${l}</div><b>${esc(c.biz)}</b>${c.person?'<br>'+esc(c.person):''}${c.phone?'<br>'+esc(c.phone):''}${c.email?'<br>'+esc(c.email):''}${c.addr?'<br>'+esc(c.addr):''}`;
+  const toB=(c,l)=>`<div class="lbl">${l}</div><b>${esc(c.biz)}</b>${c.ntn?'<br>NTN: '+esc(c.ntn):''}${c.person?'<br>'+esc(c.person):''}${c.phone?'<br>'+esc(c.phone):''}${c.email?'<br>'+esc(c.email):''}${c.addr?'<br>'+esc(c.addr):''}`;
   function moneyRows(M){let r=`<tr><td>Subtotal</td><td class="n">${cur(M.gross)}</td></tr>`;
     if(M.discount)r+=`<tr><td>${M.discLabel?esc(M.discLabel):`3 months together (−${M.discPct}%)`}</td><td class="n">−${cur(M.discount)}</td></tr>`;
     if(M.tax)r+=`<tr><td>Sales tax (${M.taxPct}%)</td><td class="n">${cur(M.tax)}</td></tr>`;
@@ -158,7 +158,7 @@ function agreement(d,ctx){
   let n=0;const S=t=>`<h3>${++n}. ${t}</h3>`;
   return `<div class="${k.wrapCls}" style="${k.wrapStyle}">${k.head(esc(T.agreementTitle||'AGREEMENT'),`No. <b>${esc(d.no)}</b><br>Date: ${fLong(d.date)}`)}
   <p class="ah">${esc(T.agreementHeading||'Video Production Services Agreement')}</p>
-  <p>This agreement is made on <b>${fLong(d.date)}</b> between <b>${esc(B.name)}</b>${B.ntn?' (NTN '+esc(B.ntn)+')':''}${B.addr?', '+esc(B.addr):''}, represented by ${esc(B.owner)} (“<b>the Studio</b>”), and <b>${esc(c.biz)}</b>${c.addr?', '+esc(c.addr):''}${c.person?', represented by '+esc(c.person):''} (“<b>the Client</b>”).</p>
+  <p>This agreement is made on <b>${fLong(d.date)}</b> between <b>${esc(B.name)}</b>${B.ntn?' (NTN '+esc(B.ntn)+')':''}${B.addr?', '+esc(B.addr):''}, represented by ${esc(B.owner)} (“<b>the Studio</b>”), and <b>${esc(c.biz)}</b>${c.ntn?' (NTN '+esc(c.ntn)+')':''}${c.addr?', '+esc(c.addr):''}${c.person?', represented by '+esc(c.person):''} (“<b>the Client</b>”).</p>
   ${S('The Services')}
   <p>The Studio will provide ${mon?'monthly video production':'a one-time video shoot'} under the <b>${esc(p.name)}${mon?' Plan':''}</b>:</p>
   <ul class="dl">${(p.items||[]).map(i=>'<li>'+esc(i)+'</li>').join('')}</ul>
