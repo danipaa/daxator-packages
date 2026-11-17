@@ -32,6 +32,7 @@ const I={
  trash:'<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>', down:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>', up:'<path d="M12 21V9M7 14l5-5 5 5M5 3h14"/>',
  wa:'<path d="M3 21l1.6-4.8A8.5 8.5 0 1 1 8 19.5z"/>', phone:'<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
  check:'<path d="M5 12l5 5L20 7"/>', link:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+ bars:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
  out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>'
 };
 const ic=(n,s='')=>`<svg viewBox="0 0 24 24" ${s}>${I[n]}</svg>`;
@@ -49,11 +50,11 @@ const DEF_PK=[
 ];
 const DEF_RATES={visit:5000,photo:500,film:25000,stories:7500,posting:20000};
 const DEF_COSTS={editor:2000,travel:1500,photo:100,film:8000};
-const DEF_BIZ={name:'Daxator Studios',owner:'Daniyal Murtaza',ntn:'',phone:'+971 58 599 5304',email:'',addr:'Karachi, Pakistan',pay:'',upfront:50,tax:0,due:3,invNext:1,agrNext:1};
+const DEF_BIZ={name:'Daxator Studios',owner:'Daniyal Murtaza',ntn:'',phone:'+971 58 599 5304',email:'',addr:'Karachi, Pakistan',pay:'',upfront:50,tax:0,due:3,invNext:1,agrNext:1,fx:280};
 const DEF_BONUS='First 3 restaurants: your first ad film is free';
 const DEF_CALC={base:'growth',reels:12,visits:4,photos:15,films:1,stories:true,posting:false,term:1};
 
-let st={v:6,trials:[],pk:clone(DEF_PK),rates:clone(DEF_RATES),costs:clone(DEF_COSTS),disc3:10,bonusOn:true,bonus:DEF_BONUS,calc:clone(DEF_CALC),t3:false,
+let st={v:7,dcur:'PKR',trials:[],pk:clone(DEF_PK),rates:clone(DEF_RATES),costs:clone(DEF_COSTS),disc3:10,bonusOn:true,bonus:DEF_BONUS,calc:clone(DEF_CALC),t3:false,
   biz:clone(DEF_BIZ),clients:[],docs:[],tpl:clone(DOCS.DEF_TPL)};
 const OLDMAP={essential:'starter',signature:'growth',flagship:'premium'};
 function load(){try{const s=localStorage.getItem(KEY);if(!s)return;const o=JSON.parse(s);applyData(o,true)}catch(e){console.warn(e)}}
@@ -64,15 +65,16 @@ function applyData(o,withSettings){
   if(!withSettings)return;
   if(Array.isArray(o.pk)&&o.pk.every(p=>p.per!=null))st.pk=DEF_PK.map(d=>({...d,...(o.pk.find(p=>p.id===d.id)||{})}));
   if(o.rates&&o.rates.visit!=null)st.rates={...DEF_RATES,...o.rates};
-  ['disc3','bonusOn','bonus','t3'].forEach(k=>{if(o[k]!==undefined)st[k]=o[k]});
+  ['disc3','bonusOn','bonus','t3','dcur'].forEach(k=>{if(o[k]!==undefined)st[k]=o[k]});
   if(o.costs)st.costs={...DEF_COSTS,...o.costs};
   if(o.biz)st.biz={...DEF_BIZ,...o.biz};
   if(o.tpl)st.tpl={...DOCS.DEF_TPL,...o.tpl};
   if(o.calc&&o.calc.base)st.calc={...DEF_CALC,...o.calc};
 }
 let saveWarned=false;
-function save(){try{st.v=6;localStorage.setItem(KEY,JSON.stringify(st))}catch(e){if(!saveWarned){saveWarned=true;toast('⚠️ Could not save on this device. Download a backup in Settings.',5000)}}}
-load();
+function save(){try{st.v=7;localStorage.setItem(KEY,JSON.stringify(st))}catch(e){if(!saveWarned){saveWarned=true;toast('⚠️ Could not save on this device. Download a backup in Settings.',5000)}}}
+function migrate(){st.docs.forEach(d=>{if(!d.kind)d.kind='package';if(!d.currency)d.currency='PKR';if(d.type==='invoice'&&!(+d.fx>0))d.fx=+st.biz.fx||280;if(d.type==='agreement'&&!['sent','signed'].includes(d.status))d.status='sent'})}
+load();migrate();
 
 /* ---------------- ui helpers ---------------- */
 let tt;function toast(m,ms=2300){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),ms)}
@@ -116,6 +118,22 @@ function snapPkg(id,S=st){
   const p=pkBy(id,S)||S.pk[0];return{id:p.id,name:p.name,monthly:p.monthly,price:price(p,S.rates),per:p.per,reels:p.reels,items:items(p)}}
 const docCtx=(S=st)=>({biz:S.biz,tpl:S.tpl,bonus:S.bonusOn?S.bonus:''});
 
+/* ---------------- invoice numbers & money (PKR / USD) ---------------- */
+const INV_RE=/^DAX-?0*(\d+)$/i, AGR_RE=/^DAX-AGR-0*(\d+)$/i;
+function nextNum(type){const re=type==='invoice'?INV_RE:AGR_RE,key=type==='invoice'?'invNext':'agrNext';let mx=0;
+  st.docs.forEach(d=>{if(d.type!==type)return;const m=String(d.no||'').trim().match(re);if(m)mx=Math.max(mx,+m[1])});return Math.max(+st.biz[key]||1,mx+1)}
+const nextInv=()=>invNo(nextNum('invoice')), nextAgr=()=>agrNo(nextNum('agreement'));
+const isUSD=d=>d.currency==='USD';
+const fxOf=d=>+d.fx||+st.biz.fx||280;
+const inPKR=(d,a)=>isUSD(d)?a*fxOf(d):a, inUSD=(d,a)=>isUSD(d)?a:a/fxOf(d);
+const usd=n=>{n=+n||0;const s=Math.abs(n)<1000&&n%1?2:0;return(n<0?'−$':'$')+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:s,maximumFractionDigits:s})};
+const amt=(d,n)=>isUSD(d)?usd(n):rs(n);
+const recv=d=>d.type!=='invoice'?0:d.status==='paid'?d.money.total:d.status==='advance'?d.money.upfront:0;
+function pays(d){if(d.type!=='invoice')return[];const M=d.money,T=M.total,U=M.upfront;
+  if(d.status==='advance')return U?[{date:d.advOn||d.date,a:U}]:[];
+  if(d.status==='paid'){if(d.advOn&&U>0&&U<T&&d.advOn!==(d.paidOn||d.date))return[{date:d.advOn,a:U},{date:d.paidOn||d.date,a:T-U}];return[{date:d.paidOn||d.date,a:T}]}
+  return[]}
+
 /* ---------------- modal system ---------------- */
 const stack=[];
 function modal({title='',body='',foot='',size='',onClose,cls=''}){
@@ -155,7 +173,7 @@ function previewDoc(d){
 }
 
 /* ---------------- router ---------------- */
-const VIEWS=[['packages','Packages','box'],['trials','Trials','cam'],['clients','Clients','users'],['settings','Settings','gear']];
+const VIEWS=[['packages','Packages','box'],['trials','Trials','cam'],['clients','Clients','users'],['invoices','Invoices','bars'],['settings','Settings','gear']];
 let view='packages';
 function drawNav(){
   const act=st.trials.filter(t=>!['won','lost'].includes(t.status)).length;
@@ -170,9 +188,9 @@ async function go(v,force){
   view=v;if(location.hash!=='#'+v)history.replaceState(null,'','#'+v);drawNav();render();window.scrollTo({top:0,behavior:'smooth'})}
 document.addEventListener('click',e=>{const n=e.target.closest('#nav [data-v],#tabbar [data-v]');if(n)go(n.dataset.v);
   const a=e.target.closest('[data-act]');if(a)quick(a.dataset.act)});
-function quick(a){if(a==='new-invoice')openDoc({type:'invoice'});if(a==='new-agreement')openDoc({type:'agreement'});if(a==='share')openShare();if(a==='calc')openCalc()}
-function render(){const m=$('main');m.onclick=m.oninput=m.onchange=null;m.innerHTML=`<div class="view">${({packages:vPackages,trials:vTrials,clients:vClients,settings:vSettings})[view]()}</div>`;
-  ({packages:wPackages,trials:wTrials,clients:wClients,settings:wSettings})[view]();$('savebar').classList.toggle('show',view==='settings'&&setDirty())}
+function quick(a){if(a==='new-invoice')openDoc({type:'invoice'});if(a==='new-custom')openDoc({type:'invoice',kind:'custom'});if(a==='new-agreement')openDoc({type:'agreement'});if(a==='share')openShare();if(a==='calc')openCalc()}
+function render(){const m=$('main');m.onclick=m.oninput=m.onchange=null;m.innerHTML=`<div class="view">${({packages:vPackages,trials:vTrials,clients:vClients,invoices:vInvoices,settings:vSettings})[view]()}</div>`;
+  ({packages:wPackages,trials:wTrials,clients:wClients,invoices:wInvoices,settings:wSettings})[view]();$('savebar').classList.toggle('show',view==='settings'&&setDirty())}
 
 /* =================== PACKAGES =================== */
 const CHEV=ic('chev');
@@ -359,31 +377,30 @@ function openTrial(r){
 /* =================== CLIENTS & DOCUMENTS =================== */
 const DSL={unpaid:'Unpaid',advance:'Advance paid',paid:'Paid',sent:'Sent',signed:'Signed'};
 const cliBy=id=>st.clients.find(c=>c.id===id);
-const recv=d=>d.type!=='invoice'?0:d.status==='paid'?d.money.total:d.status==='advance'?d.money.upfront:0;
 let selCli=null,cQuery='';
 const wide=()=>matchMedia('(min-width:1180px)').matches;
 function vClients(){
-  const inv=st.docs.filter(d=>d.type==='invoice'),billed=inv.reduce((a,d)=>a+d.money.total,0),got=inv.reduce((a,d)=>a+recv(d),0);
+  const inv=st.docs.filter(d=>d.type==='invoice'),billed=inv.reduce((a,d)=>a+inPKR(d,d.money.total),0),got=inv.reduce((a,d)=>a+inPKR(d,recv(d)),0);
   const q=cQuery.toLowerCase();
   const list=st.clients.filter(c=>!q||[c.biz,c.person,c.phone].join(' ').toLowerCase().includes(q)).sort((a,b)=>{
     const la=st.docs.find(d=>d.clientId===a.id)?.created||a.created||'',lb=st.docs.find(d=>d.clientId===b.id)?.created||b.created||'';return lb.localeCompare(la)});
   if(wide()&&!selCli&&list.length)selCli=list[0].id;
   return `<div class="ph"><div><h1>Clients</h1><p>Invoices, agreements and payments in one place.</p></div><div class="acts">
-    <button class="btn" data-act="new-agreement">${ic('edit')}New agreement</button><button class="btn dark" data-act="new-invoice">${ic('doc')}New invoice</button></div></div>
+    <button class="btn" data-act="new-agreement">${ic('edit')}New agreement</button><button class="btn" data-act="new-custom">${ic('edit')}Custom invoice</button><button class="btn dark" data-act="new-invoice">${ic('doc')}New invoice</button></div></div>
   <div class="stats stagger"><div class="stat glass"><small>Invoices</small><b data-cu="${inv.length}" data-n="1">${inv.length}</b></div><div class="stat glass"><small>Billed</small><b data-cu="${billed}">${rs(billed)}</b></div>
     <div class="stat glass"><small>Received</small><b data-cu="${got}">${rs(got)}</b></div><div class="stat hl glass"><small>Due</small><b data-cu="${billed-got}">${rs(billed-got)}</b></div></div>
-  <p class="muted" style="font-size:12.5px;margin:-6px 0 12px">Next invoice: <b>${invNo(st.biz.invNext)}</b> · Next agreement: <b>${agrNo(st.biz.agrNext)}</b></p>
+  <p class="muted" style="font-size:12.5px;margin:-6px 0 12px">Next invoice: <b>${nextInv()}</b> · Next agreement: <b>${nextAgr()}</b> · Amounts in PKR</p>
   <div class="split"><div>
     <div class="toolbar"><div class="search">${ic('search')}<input class="in" id="cQ" placeholder="Search clients…" value="${esc(cQuery)}"></div></div>
     <div class="stagger" id="clList">${list.length?list.map(c=>cliRow(c)).join(''):`<div class="empty glass card"><b>${st.clients.length?'No match':'No clients yet'}</b>${st.clients.length?'':'Create an invoice or agreement and the client is saved here.'}</div>`}</div>
   </div>${wide()?`<div class="detail glass" id="cDet">${selCli&&cliBy(selCli)?cliDetail(cliBy(selCli)):'<div class="empty"><b>Pick a client</b>Their invoices and agreements show here.</div>'}</div>`:''}</div>`}
-function cliRow(c){const ds=st.docs.filter(d=>d.clientId===c.id),iv=ds.filter(d=>d.type==='invoice'),b=iv.reduce((a,d)=>a+d.money.total,0),g=iv.reduce((a,d)=>a+recv(d),0);
+function cliRow(c){const ds=st.docs.filter(d=>d.clientId===c.id),iv=ds.filter(d=>d.type==='invoice'),b=iv.reduce((a,d)=>a+inPKR(d,d.money.total),0),g=iv.reduce((a,d)=>a+inPKR(d,recv(d)),0);
   return `<div class="cl glass ${wide()&&selCli===c.id?'on':''}" data-cl="${c.id}"><span class="av">${esc((c.biz||'?').trim().charAt(0).toUpperCase())}</span>
    <div class="grow"><b>${esc(c.biz)}</b><small>${iv.length} invoice${iv.length===1?'':'s'} · ${ds.length-iv.length} agreement${ds.length-iv.length===1?'':'s'}${c.person?' · '+esc(c.person):''}</small></div>
-   ${b-g>0?`<span class="pill due">Due ${rs(b-g)}</span>`:b?'<span class="pill paid">Paid up</span>':''}</div>`}
+   ${b-g>0.5?`<span class="pill due">Due ${rs(b-g)}</span>`:b?'<span class="pill paid">Paid up</span>':''}</div>`}
 function cliDetail(c){const ds=st.docs.filter(d=>d.clientId===c.id);
   return `<div class="row"><span class="av" style="width:52px;height:52px;font-size:20px">${esc((c.biz||'?').charAt(0).toUpperCase())}</span><div class="grow"><h2>${esc(c.biz)}</h2><div class="muted" style="font-size:13.5px">${[c.person,c.phone,c.email].filter(Boolean).map(esc).join(' · ')||'No contact details yet'}</div></div></div>
-  <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn dark sm" data-ci="${c.id}">${ic('doc')}New invoice</button><button class="btn sm" data-ca="${c.id}">${ic('edit')}New agreement</button><button class="btn sm" data-cq="${c.id}">Quote</button>
+  <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn dark sm" data-ci="${c.id}">${ic('doc')}New invoice</button><button class="btn sm" data-cc="${c.id}">${ic('edit')}Custom invoice</button><button class="btn sm" data-ca="${c.id}">${ic('edit')}New agreement</button><button class="btn sm" data-cq="${c.id}">Quote</button>
     ${c.phone?`<a class="btn sm wa" target="_blank" rel="noopener" href="https://wa.me/${waNum(c.phone)}">${ic('wa')}WhatsApp</a>`:''}</div>
   <details style="margin-top:14px"><summary class="lbl" style="cursor:pointer">Client details</summary>
     <div class="g2"><label class="fld"><span>Business</span><input class="in" data-cf="biz" value="${esc(c.biz)}"></label><label class="fld"><span>Contact person</span><input class="in" data-cf="person" value="${esc(c.person||'')}"></label>
@@ -391,10 +408,11 @@ function cliDetail(c){const ds=st.docs.filter(d=>d.clientId===c.id);
     <label class="fld"><span>Address</span><input class="in" data-cf="addr" value="${esc(c.addr||'')}"></label>
     <div class="row" style="margin-top:12px"><button class="btn sm dark" data-csave="${c.id}">Save details</button><button class="btn sm danger" data-cdel="${c.id}">${ic('trash')}Delete client</button></div></details>
   <div class="secl">Documents</div>
-  <div class="doclist">${ds.length?ds.map(d=>`<div class="dc"><div class="row"><b class="grow">${esc(d.no)} <span class="muted" style="font-weight:600;font-size:13px">${d.type==='invoice'?'Invoice':'Agreement'}</span></b><span class="pill ${d.status}">${DSL[d.status]}</span></div>
-    <div class="muted" style="font-size:13px;margin-top:4px">${fLong(d.date)} · ${esc(d.plan.name)}${d.plan.monthly?' Plan':''} · <b style="color:var(--ink)">${rs(d.money.total)}</b>${d.plan.monthly&&d.term===3?' (3 months)':''}</div>
+  <div class="doclist">${ds.length?ds.map(d=>{const inv=d.type==='invoice',T=d.money.total;return `<div class="dc"><div class="row"><b class="grow">${esc(d.no)} <span class="muted" style="font-weight:600;font-size:13px">${inv?(d.kind==='custom'?'Custom invoice':'Invoice'):'Agreement'}</span></b><span class="pill ${d.status}">${DSL[d.status]}</span></div>
+    <div class="muted" style="font-size:13px;margin-top:4px">${esc(d.plan.name)}${d.plan.monthly?' Plan':''} · <b style="color:var(--ink)">${amt(d,T)}</b>${d.plan.monthly&&d.term===3?' (3 months)':''}${inv?` · ${isUSD(d)?'≈ '+rs(inPKR(d,T)):'≈ '+usd(inUSD(d,T))}`:''}</div>
+    <div class="muted" style="font-size:12.5px;margin-top:2px">Created ${fLong(d.date)}${inv&&d.status==='paid'?' · Cleared '+fLong(d.paidOn||d.date):''}${inv&&d.advOn&&d.status!=='unpaid'?' · Advance '+fLong(d.advOn):''}</div>
     <div class="acts"><button class="btn sm" data-dp="${d.id}">${ic('eye')}Preview</button><button class="btn sm" data-dpr="${d.id}">${ic('print')}Print</button><button class="btn sm" data-dw="${d.id}">${ic('word')}Word</button>
-      <button class="btn sm" data-ds="${d.id}">Status</button><button class="btn sm" data-de="${d.id}">${ic('edit')}Edit</button><button class="btn sm danger" data-dd="${d.id}">${ic('trash')}</button></div></div>`).join(''):'<div class="empty" style="padding:20px">No documents yet.</div>'}</div>`}
+      <button class="btn sm" data-ds="${d.id}">${inv?'Payment':'Status'}</button><button class="btn sm" data-de="${d.id}">${ic('edit')}Edit</button><button class="btn sm danger" data-dd="${d.id}">${ic('trash')}</button></div></div>`}).join(''):'<div class="empty" style="padding:20px">No documents yet.</div>'}</div>`}
 function wClients(){
   qa('[data-cu]').forEach(el=>{const v=+el.dataset.cu;el.dataset.v=0;countUp(el,v,el.dataset.n?n=>String(Math.round(n)):rs,800)});
   let qt;$('cQ').oninput=e=>{cQuery=e.target.value;clearTimeout(qt);qt=setTimeout(()=>{const p=e.target.selectionStart;render();const i=$('cQ');i.focus();i.setSelectionRange(p,p)},200)};
@@ -403,10 +421,11 @@ function wClients(){
 function openCliModal(id){const c=cliBy(id);if(!c)return;const m=modal({title:esc(c.biz),size:'lg',body:`<div style="padding-top:12px">${cliDetail(c)}</div>`});
   m.body.onclick=e=>cliClick(e,m);m.refresh=()=>{const cc=cliBy(id);if(!cc){m.close();return}m.body.innerHTML=`<div style="padding-top:12px">${cliDetail(cc)}</div>`};cliModal=m}
 let cliModal=null;
-function refreshClients(){if(view==='clients')render();drawNav();if(cliModal&&!cliModal.closed)cliModal.refresh()}
+function refreshClients(){if(view==='clients'||view==='invoices')render();drawNav();if(cliModal&&!cliModal.closed)cliModal.refresh()}
 async function cliClick(e,m){const t=e.target,g=a=>{const el=t.closest('['+a+']');return el?el.getAttribute(a):null};let v;
   if((v=g('data-cl'))){if(wide()){selCli=v;render()}else openCliModal(v);return}
   if((v=g('data-ci'))){openDoc({type:'invoice',clientId:v});return}
+  if((v=g('data-cc'))){openDoc({type:'invoice',kind:'custom',clientId:v});return}
   if((v=g('data-ca'))){openDoc({type:'agreement',clientId:v});return}
   if((v=g('data-cq'))){openDoc({type:'quote',clientId:v});return}
   if((v=g('data-csave'))){const c=cliBy(v),box=t.closest('details');const biz=box.querySelector('[data-cf=biz]').value.trim();if(!biz){toast('Business name needed');return}
@@ -418,7 +437,7 @@ async function cliClick(e,m){const t=e.target,g=a=>{const el=t.closest('['+a+']'
   if((v=g('data-dp'))){previewDoc(doc(v));return}
   if((v=g('data-dpr'))){const d=doc(v);printHTML(DOCS.html(d,docCtx()),st.tpl.paper);return}
   if((v=g('data-dw'))){wordDownload(doc(v),docCtx());return}
-  if((v=g('data-ds'))){const d=doc(v),seq=d.type==='invoice'?['unpaid','advance','paid']:['sent','signed'];d.status=seq[(seq.indexOf(d.status)+1)%seq.length];save();refreshClients();toast(d.no+': '+DSL[d.status]);return}
+  if((v=g('data-ds'))){openPay(doc(v));return}
   if((v=g('data-de'))){m&&m.close();openDoc({docId:v});return}
   if((v=g('data-dd'))){const d=doc(v);if(await ask('Delete '+esc(d.no)+'?','This can’t be undone. The number won’t be reused.',[{label:'Cancel',value:0},{label:'Delete',value:1,cls:'dark'}])){st.docs=st.docs.filter(x=>x!==d);save();refreshClients();toast('Deleted '+d.no)}}
 }
@@ -426,60 +445,112 @@ async function cliClick(e,m){const t=e.target,g=a=>{const el=t.closest('['+a+']'
 /* ---------- document editor ---------- */
 function periodOf(plan,term,date){if(!plan.monthly)return 'Shoot day';const[y,mo]=date.split('-').map(Number),a=new Date(y,mo-1,1),b=new Date(y,mo-1+(term===3?2:0),1);
   const f=d=>d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});return term===3?f(a)+' – '+f(b):a.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}
+function moneyC(D){const r=D.cur==='USD'?x=>Math.round(x*100)/100:x=>Math.round(x);
+  const gross=r(D.lines.reduce((a,l)=>a+(+l.qty||0)*(+l.rate||0),0)),discount=Math.min(gross,Math.max(0,r(+D.disc||0))),net=r(gross-discount);
+  const taxPct=Math.max(0,+D.taxp||0),tax=r(net*taxPct/100),total=r(net+tax),upPct=Math.min(100,Math.max(0,Math.round(+D.adv||0))),upfront=r(total*upPct/100);
+  return{months:1,gross,rate:gross,discount,discPct:0,discLabel:'Discount',net,taxPct,tax,total,upPct,upfront,balance:r(total-upfront)}}
+async function liveRate(){const r=await fetch('https://open.er-api.com/v6/latest/USD',{cache:'no-store'});const j=await r.json();const v=j&&j.rates&&+j.rates.PKR;if(!v)throw new Error('no rate');return Math.round(v*100)/100}
 function openDoc(o={}){
-  const editing=o.docId?st.docs.find(d=>d.id===o.docId):null;
-  const D={type:editing?editing.type:(o.type||'quote'),pkg:editing?(st.pk.some(p=>p.id===editing.plan.id)?editing.plan.id:'custom'):(o.pkg||'growth'),
-    term:editing?editing.term:(o.term||(st.t3?3:1)),status:editing?editing.status:'unpaid',snap:editing?editing.plan:null,dirty:!editing,periodTouched:!!editing};
+  const editing=o.docId?st.docs.find(d=>d.id===o.docId):null,E=editing||{};
+  let kind=editing?(editing.kind||'package'):(o.kind||'package');const ty=editing?editing.type:(o.type||'quote');if(ty==='agreement')kind='package';
+  const cm=E.money&&kind==='custom'?E.money:null;
+  const D={type:ty,kind,pkg:editing&&kind==='package'?(st.pk.some(p=>p.id===editing.plan.id)?editing.plan.id:'custom'):(o.pkg||'growth'),
+    term:editing?(editing.term||1):(o.term||(st.t3?3:1)),status:editing?editing.status:(ty==='agreement'?'sent':'unpaid'),snap:editing&&kind==='package'?editing.plan:null,dirty:!editing,periodTouched:!!editing,
+    lines:editing&&editing.lines&&editing.lines.length?clone(editing.lines):[{desc:'',qty:1,rate:''}],cur:editing?(editing.currency||'PKR'):(o.cur||'PKR'),
+    disc:cm?cm.discount:0,taxp:cm?cm.taxPct:(+st.biz.tax||0),adv:cm?cm.upPct:(+st.biz.upfront||0)};
   const t0=today(),cli=editing?(cliBy(editing.clientId)||editing.client):(o.clientId?cliBy(o.clientId):(o.prefill||{}));
   const TL={quote:'quotation',invoice:'invoice',agreement:'agreement'};
-  const m=modal({title:(editing?'Edit ':'New ')+TL[D.type],size:'xl',body:`<div class="dedit"><div class="form">
+  const m=modal({title:'',size:'xl',body:`<div class="dedit"><div class="form">
     <div class="seg" id="dType" style="width:100%;margin-top:14px"><button data-t="quote">Quote</button><button data-t="invoice">Invoice</button><button data-t="agreement">Agreement</button></div>
-    <label class="fld"><span>Package</span><select class="in" id="dPkg">${st.pk.map(p=>`<option value="${p.id}">${esc(p.name)} · ${rs(price(p))}${p.monthly?'/mo':''}</option>`).join('')}<option value="custom">Custom (from calculator) · ${rs(calcBase(st.calc))}</option></select></label>
-    <div id="dTermBox"><div class="secl">Plan length</div><div class="seg" id="dTerm" style="width:100%;margin-top:8px"><button data-t="1">Monthly</button><button data-t="3">3 months · −${Math.round(d3()*100)}%</button></div></div>
+    <div id="kindBox"><div class="secl">What are you billing?</div><div class="seg" id="dKind" style="width:100%;margin-top:8px"><button data-k="package">${ic('box')}A package</button><button data-k="custom">${ic('edit')}Custom amount</button></div></div>
+    <div id="pkBox"><label class="fld"><span>Package</span><select class="in" id="dPkg">${st.pk.map(p=>`<option value="${p.id}">${esc(p.name)} · ${rs(price(p))}${p.monthly?'/mo':''}</option>`).join('')}<option value="custom">Custom (from calculator) · ${rs(calcBase(st.calc))}</option></select></label>
+      <div id="dTermBox"><div class="secl">Plan length</div><div class="seg" id="dTerm" style="width:100%;margin-top:8px"><button data-t="1">Monthly</button><button data-t="3">3 months · −${Math.round(d3()*100)}%</button></div></div></div>
+    <div id="cuBox">
+      <label class="fld"><span>Project title (optional)</span><input class="in" id="dTitle" placeholder="e.g. 3D product animation for launch"></label>
+      <div class="secl">Currency</div><div class="seg" id="dCur" style="width:100%;margin-top:8px"><button data-c="PKR">PKR · Rs</button><button data-c="USD">USD · $</button></div>
+      <div class="secl">Items</div><div class="lns" id="dLines"></div>
+      <button class="btn sm" id="dAddLn" style="margin-top:10px">${ic('plus')}Add item</button>
+      <div class="g3"><label class="fld"><span id="dDiscL">Discount</span><input class="in" id="dDisc" type="number" inputmode="decimal" min="0" step="any"></label>
+        <label class="fld"><span>Tax %</span><input class="in" id="dTax" type="number" inputmode="decimal" min="0" step="any"></label>
+        <label class="fld"><span>Advance %</span><input class="in" id="dAdv" type="number" inputmode="numeric" min="0" max="100"></label></div>
+    </div>
     <div class="secl">Client</div>
     <select class="in" id="dCli" style="margin-top:8px"><option value="">＋ New client</option>${st.clients.slice().sort((a,b)=>a.biz.localeCompare(b.biz)).map(c=>`<option value="${c.id}">${esc(c.biz)}</option>`).join('')}</select>
-    <label class="fld"><span>Business name *</span><input class="in" id="dBiz" list="dTrials" autocomplete="off" placeholder="e.g. Coffmo"></label>
+    <label class="fld"><span>Business / client name *</span><input class="in" id="dBiz" list="dTrials" autocomplete="off" placeholder="e.g. Coffmo"></label>
     <datalist id="dTrials">${st.trials.map(t=>`<option value="${esc(t.place)}">`).join('')}</datalist>
     <div class="g2"><label class="fld"><span>Contact person</span><input class="in" id="dPer"></label><label class="fld"><span>Phone</span><input class="in" id="dPh" type="tel"></label>
     <label class="fld"><span>Email</span><input class="in" id="dEm" type="email"></label><label class="fld"><span>Address</span><input class="in" id="dAd"></label></div>
     <div class="secl">Details</div>
     <div class="g2"><label class="fld"><span>Date</span><input class="in" id="dDate" type="date"></label>
-      <label class="fld" id="fNo"><span>Invoice no.</span><input class="in" id="dNo"></label>
+      <label class="fld" id="fNo"><span>Invoice no.</span><input class="in" id="dNo" autocomplete="off"><small class="hint" id="dNoH"></small></label>
       <label class="fld" id="fANo"><span>Agreement no.</span><input class="in" id="dANo"></label>
       <label class="fld" id="fDue"><span>Due date</span><input class="in" id="dDue" type="date"></label>
       <label class="fld" id="fStart"><span>Start / shoot date</span><input class="in" id="dStart" type="date"></label>
-      <label class="fld" id="fPer"><span>Period</span><input class="in" id="dPeriod"></label></div>
-    <div id="fStat"><div class="secl">Status</div><div class="seg" id="dStat" style="width:100%;margin-top:8px"></div></div>
+      <label class="fld" id="fPer"><span id="dPerL">Period</span><input class="in" id="dPeriod"></label>
+      <label class="fld" id="fFx"><span>USD rate · 1 USD = PKR</span><span class="fxrow"><input class="in" id="dFx" type="number" inputmode="decimal" min="1" step="any"><button type="button" class="btn sm" id="dFxGet">Today’s rate</button></span></label></div>
+    <div id="fStat"><div class="secl">Payment status</div><div class="seg" id="dStat" style="width:100%;margin-top:8px"></div>
+      <div class="g2"><label class="fld" id="fAdvOn"><span>Advance received on</span><input class="in" id="dAdvOn" type="date"></label><label class="fld" id="fPaidOn"><span>Cleared on (fully paid)</span><input class="in" id="dPaidOn" type="date"></label></div></div>
     <label class="fld"><span>Notes (optional)</span><textarea class="in" id="dNotes" style="min-height:60px"></textarea></label>
     <div class="sumbox" id="dSum"></div>
    </div><div class="live"><div class="pvbar"><b>Live preview</b><span class="grow"></span><span class="muted" style="font-size:12px">Updates as you type</span></div><div class="pvwrap" id="dLive"></div></div></div>`,
-   foot:`<button class="btn hide-wide" id="dPrev">${ic('eye')}Preview</button><button class="btn" id="dWord">${ic('word')}Word</button><button class="btn dark" id="dSave"></button>`});
+   foot:`<button class="btn hide-wide" id="dPrev" aria-label="Preview">${ic('eye')}<span class="tx">Preview</span></button><button class="btn" id="dWord" aria-label="Word">${ic('word')}<span class="tx">Word</span></button><button class="btn dark" id="dSave"></button>`});
   const b=m.body;
   // fill
   $('dCli').value=editing?editing.clientId:(o.clientId||'');
   const setCli=c=>{$('dBiz').value=c?.biz||'';$('dPer').value=c?.person||'';$('dPh').value=c?.phone||'';$('dEm').value=c?.email||'';$('dAd').value=c?.addr||''};setCli(cli);
   $('dDate').value=editing?editing.date:t0;$('dDue').value=editing?(editing.due||''):addDays(t0,+st.biz.due||3);$('dStart').value=editing?(editing.start||''):addDays(t0,1);
-  $('dNotes').value=editing?.notes||'';$('dPkg').value=D.pkg;$('dPeriod').value=editing?.period||'';
-  $('dNo').value=editing&&editing.type==='invoice'?editing.no:invNo(st.biz.invNext);$('dANo').value=editing&&editing.type==='agreement'?editing.no:agrNo(st.biz.agrNext);
+  $('dNotes').value=editing?.notes||'';$('dPkg').value=D.pkg;$('dPeriod').value=editing?.period||'';$('dTitle').value=editing?.title||'';
+  $('dDisc').value=D.disc||'';$('dTax').value=D.taxp||'';$('dAdv').value=D.adv;$('dFx').value=editing?fxOf(editing):(+st.biz.fx||280);
+  $('dAdvOn').value=E.advOn||'';$('dPaidOn').value=E.paidOn||'';
+  $('dNo').value=editing&&editing.type==='invoice'?editing.no:nextInv();$('dANo').value=editing&&editing.type==='agreement'?editing.no:nextAgr();
   const plan=()=>(!D.dirty&&D.snap)?D.snap:snapPkg(D.pkg);
-  function collect(){const p=plan(),term=p.monthly?D.term:1;const date=$('dDate').value||t0;
-    return{type:D.type,plan:p,term,money:money(p,term),client:{biz:$('dBiz').value.trim(),person:$('dPer').value.trim(),phone:$('dPh').value.trim(),email:$('dEm').value.trim(),addr:$('dAd').value.trim()},
-      date,due:$('dDue').value,start:$('dStart').value||date,period:$('dPeriod').value.trim()||periodOf(p,term,date),status:D.status,notes:$('dNotes').value.trim(),
-      no:D.type==='invoice'?$('dNo').value.trim().toUpperCase():D.type==='agreement'?$('dANo').value.trim().toUpperCase():''}}
+  const cust=()=>D.kind==='custom'&&D.type!=='agreement';
+  const sym=()=>D.cur==='USD'?'$':'Rs';
+  const fm=n=>D.cur==='USD'?usd(n):rs(n);
+  function drawLines(){$('dLines').innerHTML=D.lines.map((l,i)=>`<div class="ln" data-li="${i}"><input class="in" data-lf="desc" placeholder="Item ${i+1}, e.g. 30-sec 3D product animation" value="${esc(l.desc||'')}">
+    <div class="nums"><label><span>Qty</span><input class="in" data-lf="qty" type="number" inputmode="decimal" min="0" step="any" value="${esc(l.qty)}"></label>
+    <label><span>Rate (${sym()})</span><input class="in" data-lf="rate" type="number" inputmode="decimal" min="0" step="any" value="${esc(l.rate)}" placeholder="0"></label>
+    <b class="la" data-la="${i}">${fm((+l.qty||0)*(+l.rate||0))}</b>${D.lines.length>1?`<button type="button" class="lx" data-lx="${i}" aria-label="Remove item">${ic('x')}</button>`:'<span></span>'}</div></div>`).join('')}
+  function collect(){const date=$('dDate').value||t0;let p,term,M;
+    if(cust()){M=moneyC(D);const L=D.lines.filter(l=>String(l.desc||'').trim()||+l.rate);
+      p={id:'custom-inv',name:$('dTitle').value.trim()||(L[0]&&String(L[0].desc||'').trim())||'Custom project',monthly:false,price:M.gross,per:0,reels:0,items:L.map(l=>String(l.desc||'').trim()).filter(Boolean)};term=1}
+    else{p=plan();term=p.monthly?D.term:1;M=money(p,term)}
+    const inv=D.type==='invoice';
+    return{type:D.type,kind:cust()?'custom':'package',plan:p,term,money:M,currency:cust()?D.cur:'PKR',fx:Math.max(1,+$('dFx').value||+st.biz.fx||280),
+      lines:cust()?D.lines.filter(l=>String(l.desc||'').trim()||+l.rate).map(l=>({desc:String(l.desc||'').trim(),qty:+l.qty||0,rate:+l.rate||0})):null,title:cust()?$('dTitle').value.trim():'',
+      client:{biz:$('dBiz').value.trim(),person:$('dPer').value.trim(),phone:$('dPh').value.trim(),email:$('dEm').value.trim(),addr:$('dAd').value.trim()},
+      date,due:$('dDue').value,start:$('dStart').value||date,period:cust()?$('dPeriod').value.trim():($('dPeriod').value.trim()||periodOf(p,term,date)),status:D.status,
+      advOn:inv&&D.status!=='unpaid'&&M.upPct>0&&M.upPct<100?($('dAdvOn').value||(D.status==='advance'?date:'')):'',paidOn:inv&&D.status==='paid'?($('dPaidOn').value||date):'',
+      notes:$('dNotes').value.trim(),no:D.type==='invoice'?$('dNo').value.trim().toUpperCase():D.type==='agreement'?$('dANo').value.trim().toUpperCase():''}}
+  function noHint(){const v=$('dNo').value.trim().toUpperCase(),dup=v&&st.docs.find(x=>x.type==='invoice'&&x.no===v&&x.id!==E.id);
+    $('dNoH').innerHTML=dup?`<span style="color:var(--red)">Already used by ${esc(dup.client.biz)}</span>`:editing?'':`Next free number: <b>${nextInv()}</b>`;$('dNo').classList.toggle('bad',!!dup)}
   let lt;
-  function refresh(){const p=plan(),mon=p.monthly;$('dTermBox').classList.toggle('hidden',!mon);
+  function refresh(){const c=cust(),p=c?null:plan(),mon=!c&&p.monthly,inv=D.type==='invoice';
     qa('#dType button',b).forEach(x=>{x.classList.toggle('on',x.dataset.t===D.type);x.disabled=!!editing&&x.dataset.t!==D.type});
+    qa('#dKind button',b).forEach(x=>{x.classList.toggle('on',x.dataset.k===D.kind);x.disabled=!!editing&&!!E.kind&&x.dataset.k!==D.kind});
+    qa('#dCur button',b).forEach(x=>x.classList.toggle('on',x.dataset.c===D.cur));
     qa('#dTerm button',b).forEach(x=>x.classList.toggle('on',+x.dataset.t===D.term));
-    $('fNo').classList.toggle('hidden',D.type!=='invoice');$('fDue').classList.toggle('hidden',D.type!=='invoice');$('fANo').classList.toggle('hidden',D.type!=='agreement');
+    $('kindBox').classList.toggle('hidden',D.type==='agreement');$('pkBox').classList.toggle('hidden',c);$('cuBox').classList.toggle('hidden',!c);$('dTermBox').classList.toggle('hidden',!mon);
+    $('fNo').classList.toggle('hidden',!inv);$('fDue').classList.toggle('hidden',!inv);$('fANo').classList.toggle('hidden',D.type!=='agreement');$('fFx').classList.toggle('hidden',!inv);
     $('fStart').classList.toggle('hidden',D.type!=='agreement');$('fPer').classList.toggle('hidden',D.type==='agreement');$('fStat').classList.toggle('hidden',D.type==='quote');
-    $('dStat').innerHTML=(D.type==='agreement'?['sent','signed']:['unpaid','advance','paid']).map(s=>`<button data-s="${s}" class="${D.status===s?'on':''}">${DSL[s]}</button>`).join('');
-    if(!D.periodTouched&&$('dDate').value)$('dPeriod').value=periodOf(p,mon?D.term:1,$('dDate').value);
-    const M=money(p,mon?D.term:1);
-    $('dSum').innerHTML=`<b>${esc(p.name)}${mon?' Plan':''}</b> · <b>${rs(M.total)}</b>${mon&&D.term===3?' for 3 months':mon?' / month':' one time'}${M.upPct>0&&M.upPct<100?`<br><span class="muted">${M.upPct}% advance: ${rs(M.upfront)} · balance: ${rs(M.balance)}</span>`:''}`;
-    m.setTitle((editing?'Edit ':'New ')+TL[D.type]);
+    $('dPerL').textContent=c?'Period / reference (optional)':'Period';$('dDiscL').textContent='Discount ('+sym()+')';
+    const M=c?moneyC(D):money(p,mon?D.term:1),split=M.upPct>0&&M.upPct<100;
+    const sts=D.type==='agreement'?['sent','signed']:['unpaid',...(split||D.status==='advance'?['advance']:[]),'paid'];if(!sts.includes(D.status))D.status=sts[0];
+    $('dStat').innerHTML=sts.map(s=>`<button data-s="${s}" class="${D.status===s?'on':''}">${DSL[s]}</button>`).join('');
+    $('fAdvOn').classList.toggle('hidden',!inv||!split||D.status==='unpaid');$('fPaidOn').classList.toggle('hidden',!inv||D.status!=='paid');
+    if(!c&&!D.periodTouched&&$('dDate').value)$('dPeriod').value=periodOf(p,mon?D.term:1,$('dDate').value);
+    const fx=+$('dFx').value||+st.biz.fx||280,cu=c?D.cur:'PKR',other=cu==='USD'?'≈ '+rs(M.total*fx):'≈ '+usd(M.total/fx);
+    const nm=c?($('dTitle').value.trim()||'Custom invoice'):p.name+(mon?' Plan':'');
+    $('dSum').innerHTML=`<b>${esc(nm)}</b> · <b>${cu==='USD'?usd(M.total):rs(M.total)}</b>${mon&&D.term===3?' for 3 months':mon?' / month':c?'':' one time'} <span class="muted">${other}</span>${split?`<br><span class="muted">${M.upPct}% advance: ${cu==='USD'?usd(M.upfront):rs(M.upfront)} · balance: ${cu==='USD'?usd(M.balance):rs(M.balance)}</span>`:''}`;
+    qa('[data-la]',b).forEach(el=>{const l=D.lines[+el.dataset.la];if(l)el.textContent=fm((+l.qty||0)*(+l.rate||0))});
+    if(inv)noHint();
+    m.setTitle((editing?'Edit ':'New ')+(c&&D.type==='invoice'?'custom invoice':c?'custom quotation':TL[D.type]));
     $('dSave').innerHTML=D.type==='quote'?ic('print')+'Print / Save PDF':ic('check')+(editing?'Update & preview':'Save & preview');
     clearTimeout(lt);lt=setTimeout(()=>{if(getComputedStyle(b.querySelector('.live')).display!=='none'){const d=collect();d.client.biz=d.client.biz||'Client name';d.no=d.no||'—';renderPaper($('dLive'),DOCS.html(d,docCtx()),st.tpl.paper)}},120)}
-  b.addEventListener('input',e=>{if(e.target.id==='dPeriod')D.periodTouched=true;refresh()});
+  b.addEventListener('input',e=>{const t=e.target;if(t.id==='dPeriod')D.periodTouched=true;
+    const li=t.closest('[data-li]');if(li&&t.dataset.lf){D.lines[+li.dataset.li][t.dataset.lf]=t.dataset.lf==='desc'?t.value:t.value}
+    if(t.id==='dDisc')D.disc=+t.value||0;if(t.id==='dTax')D.taxp=+t.value||0;if(t.id==='dAdv')D.adv=+t.value||0;
+    refresh()});
   b.addEventListener('change',e=>{const id=e.target.id;
     if(id==='dPkg'){D.pkg=e.target.value;D.dirty=true}
     if(id==='dCli'){setCli(cliBy(e.target.value)||null)}
@@ -487,19 +558,27 @@ function openDoc(o={}){
     if(id==='dBiz'&&!$('dCli').value){const v=e.target.value.trim().toLowerCase();const ex=st.clients.find(c=>c.biz.toLowerCase()===v);
       if(ex){$('dCli').value=ex.id;setCli(ex);toast('Existing client selected')}else{const tr=st.trials.find(t=>t.place.toLowerCase()===v);if(tr){if(!$('dPer').value)$('dPer').value=tr.name||'';if(!$('dPh').value)$('dPh').value=tr.phone||''}}}
     refresh()});
-  b.addEventListener('click',e=>{const ty=e.target.closest('#dType [data-t]');if(ty&&!ty.disabled){D.type=ty.dataset.t;D.status=D.type==='agreement'?'sent':'unpaid';refresh()}
-    const tm=e.target.closest('#dTerm [data-t]');if(tm){D.term=+tm.dataset.t;D.dirty=true;refresh()}
-    const s=e.target.closest('#dStat [data-s]');if(s){D.status=s.dataset.s;refresh()}});
+  b.addEventListener('click',async e=>{const t=e.target;
+    const ty=t.closest('#dType [data-t]');if(ty&&!ty.disabled){D.type=ty.dataset.t;D.status=D.type==='agreement'?'sent':'unpaid';refresh()}
+    const kd=t.closest('#dKind [data-k]');if(kd&&!kd.disabled){D.kind=kd.dataset.k;refresh();if(D.kind==='custom'){const f=b.querySelector('[data-lf="desc"]');if(f&&!f.value)setTimeout(()=>f.focus(),60)}}
+    const cu=t.closest('#dCur [data-c]');if(cu){D.cur=cu.dataset.c;drawLines();refresh()}
+    if(t.closest('#dAddLn')){D.lines.push({desc:'',qty:1,rate:''});drawLines();refresh();const ins=qa('[data-lf="desc"]',b);ins[ins.length-1].focus()}
+    const lx=t.closest('[data-lx]');if(lx){D.lines.splice(+lx.dataset.lx,1);drawLines();refresh()}
+    const tm=t.closest('#dTerm [data-t]');if(tm){D.term=+tm.dataset.t;D.dirty=true;refresh()}
+    const s=t.closest('#dStat [data-s]');if(s){D.status=s.dataset.s;if(D.status!=='unpaid'&&!$('dAdvOn').value)$('dAdvOn').value=today();if(D.status==='paid'&&!$('dPaidOn').value)$('dPaidOn').value=today();refresh()}
+    if(t.closest('#dFxGet')){const bt=$('dFxGet');bt.disabled=true;bt.textContent='…';try{$('dFx').value=await liveRate();toast('Rate updated: 1 USD = Rs '+$('dFx').value)}catch(er){toast('Couldn’t get the live rate. Type it in.')}bt.disabled=false;bt.textContent='Today’s rate';refresh()}});
   function commit(){const d=collect();
+    if(cust()&&!(d.money.total>0)){toast('Add at least one item with a rate');const r=b.querySelector('[data-lf="rate"]');r&&r.focus();return null}
     if(D.type==='quote')return d;
-    if(!d.client.biz){toast('Add the client business name');$('dBiz').focus();return null}
-    const dup=st.docs.find(x=>x.type===d.type&&x.no===d.no&&x.id!==editing?.id);
+    if(!d.client.biz){toast('Add the client name');$('dBiz').focus();return null}
+    if(!d.no)d.no=d.type==='invoice'?nextInv():nextAgr();
+    const dup=st.docs.find(x=>x.type===d.type&&x.no===d.no&&x.id!==E.id);
     if(dup){toast(d.no+' is already used by '+dup.client.biz+'. Change the number.',3500);return null}
     let cid=$('dCli').value;
     if(cid&&cliBy(cid))Object.assign(cliBy(cid),d.client);
     else{const ex=st.clients.find(c=>c.biz.toLowerCase()===d.client.biz.toLowerCase());if(ex){cid=ex.id;Object.assign(ex,d.client)}else{cid=uid();st.clients.push({id:cid,...d.client,created:new Date().toISOString()})}}
-    d.clientId=cid;if(!d.no)d.no=d.type==='invoice'?invNo(st.biz.invNext):agrNo(st.biz.agrNext);
-    const mm=d.no.match(/(\d+)$/),key=d.type==='invoice'?'invNext':'agrNext';if(mm&&+mm[1]>=st.biz[key])st.biz[key]=+mm[1]+1;
+    d.clientId=cid;
+    const mm=d.no.match(d.type==='invoice'?INV_RE:AGR_RE),key=d.type==='invoice'?'invNext':'agrNext';if(mm&&+mm[1]>=st.biz[key])st.biz[key]=+mm[1]+1;
     if(editing){Object.assign(editing,d,{updated:new Date().toISOString()});d.id=editing.id}else{d.id=uid();d.created=new Date().toISOString();st.docs.unshift(d)}
     save();selCli=cid;refreshClients();return editing||d}
   $('dSave').onclick=()=>{const d=commit();if(!d)return;
@@ -507,8 +586,99 @@ function openDoc(o={}){
     m.close();toast((editing?'Updated ':'Saved ')+d.no+' ✓');setTimeout(()=>previewDoc(d),300)};
   $('dWord').onclick=()=>{const d=commit();if(!d)return;wordDownload(d,docCtx());if(D.type!=='quote'){m.close();toast('Saved '+d.no+' ✓')}};
   $('dPrev').onclick=()=>{const d=collect();d.client.biz=d.client.biz||'Client name';d.no=d.no||'—';previewDoc(d)};
-  refresh();
+  drawLines();refresh();
 }
+
+/* =================== PAYMENTS =================== */
+function openPay(d){
+  if(d.type!=='invoice'){d.status=d.status==='signed'?'sent':'signed';save();refreshClients();toast(d.no+': '+DSL[d.status]);return}
+  const M=d.money,split=M.upPct>0&&M.upPct<100;let s=d.status;
+  const opts=['unpaid',...(split||s==='advance'?['advance']:[]),'paid'];
+  const m=modal({title:'Payment · '+esc(d.no),size:'sm',body:`<p style="margin:12px 0 0;line-height:1.5">${esc(d.client.biz)}<br><span class="muted">Total</span> <b>${amt(d,M.total)}</b> <span class="muted">${isUSD(d)?'≈ '+rs(inPKR(d,M.total)):'≈ '+usd(inUSD(d,M.total))}</span>${split?`<br><span class="muted">${M.upPct}% advance: ${amt(d,M.upfront)} · balance: ${amt(d,M.balance)}</span>`:''}</p>
+    <div class="seg" id="pS" style="width:100%;margin-top:14px">${opts.map(k=>`<button data-s="${k}">${DSL[k]}</button>`).join('')}</div>
+    <label class="fld" id="pA"><span>Advance received on</span><input class="in" type="date" id="pAd"></label>
+    <label class="fld" id="pP"><span>Cleared on (fully paid)</span><input class="in" type="date" id="pPd"></label>`,
+    foot:`<button class="btn" data-x>Cancel</button><button class="btn dark" data-ok>${ic('check')}Save</button>`});
+  $('pAd').value=d.advOn||'';$('pPd').value=d.paidOn||'';
+  const draw=()=>{qa('#pS button',m.el).forEach(x=>x.classList.toggle('on',x.dataset.s===s));$('pA').classList.toggle('hidden',!split||s==='unpaid');$('pP').classList.toggle('hidden',s!=='paid');
+    if(split&&s!=='unpaid'&&!$('pAd').value)$('pAd').value=s==='advance'?today():'';if(s==='paid'&&!$('pPd').value)$('pPd').value=today()};
+  m.body.onclick=e=>{const x=e.target.closest('[data-s]');if(x){s=x.dataset.s;draw()}};
+  m.foot.onclick=e=>{if(e.target.closest('[data-x]'))m.close();
+    if(e.target.closest('[data-ok]')){d.status=s;d.advOn=split&&s!=='unpaid'?($('pAd').value||(s==='advance'?today():'')):'';d.paidOn=s==='paid'?($('pPd').value||today()):'';
+      save();m.close();refreshClients();toast(d.no+': '+DSL[s]+' ✓')}};
+  draw()}
+
+/* =================== INVOICES & EARNINGS =================== */
+let iYear=String(new Date().getFullYear()),iQ='',iF='all';
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fS=s=>{if(!s)return'';const[y,mo,x]=s.split('-');return new Date(+y,+mo-1,+x).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})};
+const kfmt=n=>{const u=st.dcur==='USD',a=Math.abs(n),p=u?'$':'';return a>=1e6?p+(n/1e6).toFixed(a>=1e7?0:1).replace(/\.0$/,'')+'M':a>=1e3?p+(n/1e3).toFixed(a>=1e5?0:1).replace(/\.0$/,'')+'k':p+Math.round(n)};
+function invData(){
+  const inv=st.docs.filter(d=>d.type==='invoice'),U=st.dcur==='USD',cv=(d,a)=>U?inUSD(d,a):inPKR(d,a),cvo=(d,a)=>U?inPKR(d,a):inUSD(d,a);
+  const pe=[];inv.forEach(d=>pays(d).forEach(p=>pe.push({d,date:p.date,v:cv(d,p.a),o:cvo(d,p.a)})));
+  const years=new Set([String(new Date().getFullYear())]);inv.forEach(d=>d.date&&years.add(d.date.slice(0,4)));pe.forEach(p=>p.date&&years.add(p.date.slice(0,4)));
+  const Y=[...years].sort().reverse(),inY=s=>iYear==='all'||(s||'').slice(0,4)===iYear;
+  const sum=(a,f)=>a.reduce((x,y)=>x+f(y),0);
+  const earnedP=pe.filter(p=>inY(p.date)),billedI=inv.filter(d=>inY(d.date));
+  return{inv,pe,Y,inY,cv,cvo,U,
+    earned:sum(earnedP,p=>p.v),earnedO:sum(earnedP,p=>p.o),all:sum(pe,p=>p.v),allO:sum(pe,p=>p.o),
+    billed:sum(billedI,d=>cv(d,d.money.total)),billedO:sum(billedI,d=>cvo(d,d.money.total)),
+    due:sum(billedI,d=>cv(d,d.money.total-recv(d))),dueO:sum(billedI,d=>cvo(d,d.money.total-recv(d))),
+    count:billedI.length,unpaidN:billedI.filter(d=>d.status!=='paid').length,earnedP,billedI}}
+function vInvoices(){const X=invData(),fm=n=>X.U?usd(n):rs(n),fo=n=>X.U?rs(n):usd(n);
+  // chart buckets
+  let buckets;
+  if(iYear==='all'){const ys=X.Y.slice().reverse();buckets=ys.map(y=>({l:y,e:0,b:0,k:y}))}else buckets=MON.map((l,i)=>({l,e:0,b:0,k:iYear+'-'+String(i+1).padStart(2,'0')}));
+  const bk=s=>iYear==='all'?(s||'').slice(0,4):(s||'').slice(0,7);
+  X.earnedP.forEach(p=>{const b=buckets.find(x=>x.k===bk(p.date));if(b)b.e+=p.v});X.billedI.forEach(d=>{const b=buckets.find(x=>x.k===bk(d.date));if(b)b.b+=X.cv(d,d.money.total)});
+  const mx=Math.max(1,...buckets.map(b=>Math.max(b.e,b.b)));
+  // top clients
+  const tc={};X.earnedP.forEach(p=>{const k=p.d.clientId||p.d.client.biz;tc[k]=tc[k]||{n:(cliBy(p.d.clientId)||p.d.client).biz,v:0};tc[k].v+=p.v});
+  const tops=Object.values(tc).sort((a,b)=>b.v-a.v).slice(0,5),tmx=Math.max(1,...tops.map(t=>t.v));
+  // register
+  const q=iQ.toLowerCase();
+  const list=X.inv.filter(d=>X.inY(d.date)&&(iF==='all'||(iF==='open'?d.status!=='paid':d.status===iF))&&(!q||[d.no,d.client.biz,d.plan.name,d.title].join(' ').toLowerCase().includes(q)))
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||'')||String(b.no).localeCompare(String(a.no),undefined,{numeric:true}));
+  const per=iYear==='all'?'all time':iYear;
+  return `<div class="ph"><div><h1>Invoices</h1><p>Every invoice you’ve made, what’s been paid, and what you’ve earned.</p></div><div class="acts">
+    <button class="btn" data-act="new-custom">${ic('edit')}Custom invoice</button><button class="btn dark" data-act="new-invoice">${ic('box')}Package invoice</button></div></div>
+  <div class="ibar"><div class="chips" style="margin:0">${['all',...X.Y].map(y=>`<button class="chip ${iYear===y?'on':''}" data-y="${y}">${y==='all'?'All time':y===String(new Date().getFullYear())?'This year · '+y:y===String(new Date().getFullYear()-1)?'Last year · '+y:y}</button>`).join('')}</div>
+    <div class="seg" id="iCur"><button data-cur="PKR" class="${X.U?'':'on'}">PKR</button><button data-cur="USD" class="${X.U?'on':''}">USD</button></div></div>
+  <div class="stats stagger"><div class="stat hl glass"><small>Earned · ${per}</small><b data-cu="${X.earned}">${fm(X.earned)}</b><span class="alt">≈ ${fo(X.earnedO)}</span></div>
+    <div class="stat glass"><small>Billed · ${per}</small><b data-cu="${X.billed}">${fm(X.billed)}</b><span class="alt">${X.count} invoice${X.count===1?'':'s'}</span></div>
+    <div class="stat glass"><small>Still to collect</small><b data-cu="${X.due}">${fm(X.due)}</b><span class="alt">${X.unpaidN} not fully paid</span></div>
+    <div class="stat glass"><small>All-time earned</small><b data-cu="${X.all}">${fm(X.all)}</b><span class="alt">≈ ${fo(X.allO)}</span></div></div>
+  <div class="igrid"><div class="chart glass"><div class="row"><h3 class="grow">${iYear==='all'?'Earnings by year':'Earnings by month · '+iYear}</h3><span class="lg"><i class="b"></i>Billed</span><span class="lg"><i class="e"></i>Earned</span></div>
+      <div class="bars">${buckets.map(b=>`<div class="bar" title="${b.l}: earned ${fm(b.e)} · billed ${fm(b.b)}"><span class="bb" data-k="${b.b/mx}"></span><span class="be" data-k="${b.e/mx}"></span>${b.e?`<span class="bv" style="--k:${b.e/mx}">${kfmt(b.e)}</span>`:''}<span class="bl">${b.l}</span></div>`).join('')}</div></div>
+    <div class="tops glass"><h3>Top clients · ${per}</h3>${tops.length?tops.map(t=>`<div class="tc"><div class="r"><span>${esc(t.n)}</span><span>${fm(t.v)}</span></div><div class="tr"><i data-w="${t.v/tmx}"></i></div></div>`).join(''):'<p class="muted" style="font-size:13.5px;margin-top:12px">No payments received in this period yet.</p>'}</div></div>
+  <div class="toolbar"><div class="search">${ic('search')}<input class="in" id="iQ" placeholder="Search number, client or project…" value="${esc(iQ)}"></div>
+    <button class="btn" id="iCsv">${ic('down')}CSV</button></div>
+  <div class="chips">${[['all','All'],['open','Not paid yet'],['unpaid','Unpaid'],['advance','Advance paid'],['paid','Paid']].map(([k,l])=>`<button class="chip ${iF===k?'on':''}" data-f="${k}">${l}</button>`).join('')}</div>
+  <p class="muted" style="font-size:12.5px;margin:0 0 10px">Next invoice number: <b>${nextInv()}</b> · ${list.length} shown</p>
+  <div class="reg">${list.length?`<div class="rh"><span>No.</span><span>Client</span><span>Created</span><span>Cleared</span><span>Status</span><span style="text-align:right">Amount</span><span></span></div>`+list.map(d=>{const T=d.money.total;
+      return `<div class="rr glass"><div class="c-no"><b>${esc(d.no)}</b><small>${d.kind==='custom'?'Custom':'Package'}${isUSD(d)?' · USD':''}</small></div>
+      <div class="c-cl"><b>${esc(d.client.biz)}</b><small>${esc(d.plan.name)}${d.plan.monthly?' Plan':''}${d.plan.monthly&&d.term===3?' · 3 months':''}</small></div>
+      <div class="c-dt"><small class="lbl2">Created</small>${fS(d.date)}</div>
+      <div class="c-cd"><small class="lbl2">Cleared</small>${d.status==='paid'?fS(d.paidOn||d.date):d.status==='advance'&&d.advOn?'<span class="muted">Adv. '+fS(d.advOn)+'</span>':'<span class="muted">—</span>'}</div>
+      <div class="c-st"><span class="pill ${d.status}">${DSL[d.status]}</span></div>
+      <div class="c-am"><b>${amt(d,T)}</b><small>${isUSD(d)?'≈ '+rs(inPKR(d,T)):'≈ '+usd(inUSD(d,T))}</small></div>
+      <div class="c-ac"><button class="btn sm" data-dp="${d.id}" aria-label="Preview">${ic('eye')}<span class="hm">Preview</span></button><button class="btn sm" data-ds="${d.id}">Payment</button><button class="btn sm" data-de="${d.id}" aria-label="Edit">${ic('edit')}</button><button class="btn sm danger" data-dd="${d.id}" aria-label="Delete">${ic('trash')}</button></div></div>`}).join('')
+    :`<div class="empty glass card"><b>${X.inv.length?'Nothing here':'No invoices yet'}</b>${X.inv.length?'Try another year or filter.':'Create a package or custom invoice. You can also add your old invoices with their real dates and numbers, and they’ll count in your earnings.'}</div>`}</div>`}
+function wInvoices(){
+  qa('[data-cu]').forEach(el=>{const v=+el.dataset.cu;el.dataset.v=0;countUp(el,v,st.dcur==='USD'?usd:rs,800)});
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{qa('.bars [data-k]').forEach(el=>el.style.setProperty('--k',el.dataset.k));qa('.tc [data-w]').forEach(el=>el.style.width=(+el.dataset.w*100)+'%')}));
+  let qt;$('iQ').oninput=e=>{iQ=e.target.value;clearTimeout(qt);qt=setTimeout(()=>{const p=e.target.selectionStart;render();const i=$('iQ');i.focus();i.setSelectionRange(p,p)},200)};
+  $('iCsv').onclick=exportInvCsv;
+  $('main').onclick=e=>{const t=e.target;let x;
+    if((x=t.closest('[data-y]'))){iYear=x.dataset.y;render();return}
+    if((x=t.closest('[data-f]'))){iF=x.dataset.f;render();return}
+    if((x=t.closest('[data-cur]'))){st.dcur=x.dataset.cur;save();render();return}
+    cliClick(e,null)}}
+function exportInvCsv(){const inv=st.docs.filter(d=>d.type==='invoice');if(!inv.length){toast('No invoices yet');return}
+  const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"',r2=n=>Math.round(n*100)/100;
+  const cols=['Invoice','Type','Created','Due','Client','Contact','Phone','Item / plan','Currency','Total','USD rate','Total PKR','Total USD','Advance','Status','Advance received on','Cleared on','Received PKR','Received USD','Outstanding PKR'];
+  dl(today()+'-invoices.csv','﻿'+[cols.join(',')].concat(inv.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(d=>{const T=d.money.total,R=recv(d);
+    return[d.no,d.kind==='custom'?'Custom':'Package',d.date,d.due,d.client.biz,d.client.person,d.client.phone,d.plan.name+(d.plan.monthly&&d.term===3?' (3 months)':''),d.currency||'PKR',T,fxOf(d),Math.round(inPKR(d,T)),r2(inUSD(d,T)),d.money.upfront,DSL[d.status],d.advOn||'',d.status==='paid'?(d.paidOn||d.date):'',Math.round(inPKR(d,R)),r2(inUSD(d,R)),Math.round(inPKR(d,T-R))].map(q).join(',')})).join('\n'),'text/csv');toast('Invoices CSV downloaded')}
 
 /* =================== SETTINGS (draft + Save) =================== */
 let draft=null,base='';
@@ -517,7 +687,7 @@ function newDraft(){draft=clone(Object.fromEntries(SKEYS.map(k=>[k,st[k]])));bas
 const setDirty=()=>!!draft&&JSON.stringify(draft)!==base;
 function markDirty(){$('savebar').classList.toggle('show',view==='settings'&&setDirty())}
 function saveSettings(){if(!draft)return;
-  const B=draft.biz;['upfront','tax','due','invNext','agrNext'].forEach(k=>B[k]=Math.max(0,Math.round(+B[k]||0)));B.upfront=Math.min(100,B.upfront);B.invNext=Math.max(1,B.invNext);B.agrNext=Math.max(1,B.agrNext);
+  const B=draft.biz;['upfront','tax','due','invNext','agrNext'].forEach(k=>B[k]=Math.max(0,Math.round(+B[k]||0)));B.upfront=Math.min(100,B.upfront);B.invNext=Math.max(1,B.invNext);B.agrNext=Math.max(1,B.agrNext);B.fx=Math.max(1,Math.round((+B.fx||280)*100)/100);
   draft.disc3=Math.min(90,Math.max(0,Math.round(+draft.disc3||0)));
   SKEYS.forEach(k=>st[k]=clone(draft[k]));save();newDraft();markDirty();toast('Settings saved ✓');drawNav()}
 function discardSettings(){newDraft();markDirty()}
@@ -538,8 +708,10 @@ function vSettings(){
     <div class="g2">${f('biz.name','Business name')}${f('biz.owner','Owner name')}${f('biz.ntn','NTN number','text','placeholder="Add when you have it"')}${f('biz.phone','Phone / WhatsApp','tel')}${f('biz.email','Email','email')}${f('biz.addr','Address')}</div>
     <label class="fld"><span>Payment details (bank, account title, IBAN)</span><textarea class="in" data-d="biz.pay" placeholder="Bank: …&#10;Account title: …&#10;IBAN: …">${esc(B.pay)}</textarea></label>
     <div class="g3">${f('biz.upfront','Advance %','number')}${f('biz.tax','Sales tax %','number')}${f('biz.due','Balance due (days)','number')}</div>
-    <div class="g2">${f('biz.invNext','Next invoice number','number','min="1"')}${f('biz.agrNext','Next agreement number','number','min="1"')}</div>
-    <p class="muted" style="font-size:12.5px">Next: <b id="nInv">${invNo(B.invNext)}</b> · <b id="nAgr">${agrNo(B.agrNext)}</b></p></section>
+    <div class="g2">${f('biz.invNext','Start invoice numbers from','number','min="1"')}${f('biz.agrNext','Start agreement numbers from','number','min="1"')}</div>
+    <p class="muted" style="font-size:12.5px">Next: <b id="nInv">${invNo(Math.max(+B.invNext||1,nextNum('invoice')))}</b> · <b id="nAgr">${agrNo(Math.max(+B.agrNext||1,nextNum('agreement')))}</b>. The app always skips numbers you’ve already used.</p>
+    <label class="fld"><span>Dollar rate · 1 USD = PKR</span><span class="fxrow"><input class="in" data-d="biz.fx" type="number" inputmode="decimal" step="any" min="1" value="${esc(B.fx)}"><button type="button" class="btn sm" id="sFxGet">Today’s rate</button></span></label>
+    <p class="muted" style="font-size:12px;margin:6px 0 0">Used to show PKR and USD side by side. Each invoice keeps the rate from the day you made it.</p></section>
 
   <section class="sc glass" id="s-pk"><h3>Packages</h3><p class="muted">Total = reels × per reel + shoots + photos + ad films + extras. Type a total to work out the per-reel price.</p>
     ${S.pk.map((p,i)=>`<div class="pkedit" data-pi="${i}"><div class="head"><b>${esc(p.name)}</b><span class="muted" style="font-size:12px">${p.monthly?'per month':'one time'}</span><span class="tot" id="pt-${i}">${rs(price(p,R))}</span></div>
@@ -569,7 +741,8 @@ function vSettings(){
         <button class="btn sm" id="tLogoUp">${ic('up')}Upload logo</button>${T.logo?`<button class="btn sm ghost" id="tLogoRs">Use default</button>`:''}<input type="file" id="tLogoF" accept="image/*" class="hidden"></div>
       <div class="g2">${f('tpl.invoiceTitle','Invoice title')}${f('tpl.quoteTitle','Quotation title')}${f('tpl.agreementTitle','Agreement title')}${f('tpl.agreementHeading','Agreement heading')}</div>
       <label class="fld"><span>Invoice terms (one per line)</span><textarea class="in" data-d="tpl.terms" style="min-height:120px">${esc(T.terms)}</textarea></label>
-      <p class="muted" style="font-size:12px;margin:6px 0 0">Use <b>{advance}</b>, <b>{balance}</b> and <b>{due}</b>. They fill in automatically.</p>
+      <label class="fld"><span>Custom invoice terms (one per line)</span><textarea class="in" data-d="tpl.customTerms" style="min-height:96px">${esc(T.customTerms)}</textarea></label>
+      <p class="muted" style="font-size:12px;margin:6px 0 0">Use <b>{advance}</b>, <b>{balance}</b>, <b>{due}</b> and <b>{currency}</b>. They fill in automatically.</p>
       ${f('tpl.footer','Footer note')}
       <button class="btn sm ghost" id="tReset" style="margin-top:10px">Reset template to default</button>
     </div>
@@ -590,7 +763,7 @@ function vSettings(){
   </div>`}
 function getP(o,p){return p.split('.').reduce((a,k)=>a==null?a:a[k],o)}
 function setP(o,p,v){const ks=p.split('.');let a=o;ks.slice(0,-1).forEach(k=>a=a[k]);a[ks[ks.length-1]]=v}
-const NUMS=/^(biz\.(upfront|tax|due|invNext|agrNext)|disc3|rates\.|costs\.|pk\.\d+\.(per|reels|visits|photos|films))/;
+const NUMS=/^(biz\.(upfront|tax|due|invNext|agrNext|fx)|disc3|rates\.|costs\.|pk\.\d+\.(per|reels|visits|photos|films))/;
 let tpvType='invoice',tpvT;
 function sampleDoc(type){const S=draft,p=snapPkg('growth',S),date=today(),M=money(p,1,S);
   return{type,no:type==='invoice'?invNo(S.biz.invNext):type==='agreement'?agrNo(S.biz.agrNext):'',plan:p,term:1,money:M,date,due:addDays(date,+S.biz.due||3),start:addDays(date,1),
@@ -607,7 +780,7 @@ function wSettings(){
     if(el.dataset.ex!=null)S.pk[+el.dataset.ex].extras=el.value.split('\n').map(s=>s.trim()).filter(Boolean);
     const pe=el.closest('[data-pi]');if(pe){const i=+pe.dataset.pi;if(el.dataset.d&&el.dataset.d.endsWith('.name'))pe.querySelector('.head b').textContent=el.value||'Untitled';pkLive(i)}
     if(el.dataset.d&&/^rates\./.test(el.dataset.d))S.pk.forEach((_,i)=>pkLive(i));
-    if(el.dataset.d==='biz.invNext')$('nInv').textContent=invNo(+el.value||1);if(el.dataset.d==='biz.agrNext')$('nAgr').textContent=agrNo(+el.value||1);
+    if(el.dataset.d==='biz.invNext')$('nInv').textContent=invNo(Math.max(+el.value||1,nextNum('invoice')));if(el.dataset.d==='biz.agrNext')$('nAgr').textContent=agrNo(Math.max(+el.value||1,nextNum('agreement')));
     if(el.id==='tAccC'){S.tpl.accent=el.value;qa('#tAcc [data-acc]').forEach(b=>b.classList.remove('on'))}
     markDirty();drawTplPreview()};
   main.onchange=e=>{const el=e.target;
@@ -622,6 +795,7 @@ function wSettings(){
     const pv=t.closest('#tpvT [data-t]');if(pv){tpvType=pv.dataset.t;qa('#tpvT button').forEach(b=>b.classList.toggle('on',b===pv));drawTplPreview()}};
   function refreshOpts(){qa('[data-opt="header"] .opt .sw').forEach((sw,i)=>{const k=['classic','band','minimal'][i];sw.style.cssText=k==='band'?`background:${S.tpl.accent}`:k==='minimal'?'border-left:4px solid '+S.tpl.accent:'border-bottom:3px solid #151311'})}
   $('stSave').onclick=()=>{saveSettings();render()};
+  $('sFxGet').onclick=async()=>{const bt=$('sFxGet');bt.disabled=true;bt.textContent='…';try{const v=await liveRate();S.biz.fx=v;main.querySelector('[data-d="biz.fx"]').value=v;markDirty();toast('1 USD = Rs '+v+'. Tap Save.')}catch(er){toast('Couldn’t get the live rate. Type it in.')}bt.disabled=false;bt.textContent='Today’s rate'};
   $('stDisc').onclick=()=>{if(!setDirty()){toast('No changes to discard');return}discardSettings();render();toast('Changes discarded')};
   $('tLogoUp').onclick=()=>$('tLogoF').click();
   $('tLogoF').onchange=e=>{const fl=e.target.files[0];if(!fl)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,600/Math.max(im.width,im.height)),c=document.createElement('canvas');
@@ -639,15 +813,13 @@ function wSettings(){
       const n=add('trials')+add('clients')+add('docs');
       if(useS){applyData({...o,trials:null,clients:null,docs:null},true)}
       if(o.biz){['invNext','agrNext'].forEach(k=>{if(+o.biz[k]>st.biz[k])st.biz[k]=+o.biz[k]})}
-      save();newDraft();render();drawNav();toast('Restored '+n+' records'+(useS?' + settings':'')+' ✓',3000)}catch(er){toast('That isn’t a valid backup file')}};rd.readAsText(fl);e.target.value=''};
+      migrate();save();newDraft();render();drawNav();toast('Restored '+n+' records'+(useS?' + settings':'')+' ✓',3000)}catch(er){toast('That isn’t a valid backup file')}};rd.readAsText(fl);e.target.value=''};
   $('wImp').onclick=()=>$('wF').click();
   $('wF').onchange=e=>{const fl=e.target.files[0];if(!fl)return;const rd=new FileReader();rd.onload=()=>{try{const w=JSON.parse(rd.result);if(!Array.isArray(w))throw 0;importWalk(w)}catch(er){toast('That isn’t a walk-in backup file')}};rd.readAsText(fl);e.target.value=''};
   const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
   $('csvT').onclick=()=>{if(!st.trials.length){toast('No trials yet');return}const cols=['place','name','role','phone','status','date','time','pkg','notes','created'];
     dl(today()+'-trial-shoots.csv','﻿'+[cols.join(',')].concat(st.trials.map(r=>cols.map(k=>q(k==='status'?SL[r.status]:k==='pkg'?(pkBy(r.pkg)?.name||''):r[k])).join(','))).join('\n'),'text/csv')};
-  $('csvI').onclick=()=>{const inv=st.docs.filter(d=>d.type==='invoice');if(!inv.length){toast('No invoices yet');return}
-    const cols=['Invoice','Date','Due','Client','Contact','Phone','Plan','Months','Total','Advance','Balance','Status','Received'];
-    dl(today()+'-invoices.csv','﻿'+[cols.join(',')].concat(inv.map(d=>[d.no,d.date,d.due,d.client.biz,d.client.person,d.client.phone,d.plan.name,d.plan.monthly?d.term:1,d.money.total,d.money.upfront,d.money.balance,DSL[d.status],recv(d)].map(q).join(','))).join('\n'),'text/csv')};
+  $('csvI').onclick=exportInvCsv;
 }
 
 /* =================== START =================== */
@@ -655,5 +827,5 @@ const h=location.hash.slice(1);if(VIEWS.some(v=>v[0]===h))view=h;
 addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(VIEWS.some(x=>x[0]===v)&&v!==view)go(v)});
 let lastWide=wide();addEventListener('resize',()=>{const w=wide();if(w!==lastWide){lastWide=w;if(view==='clients')render()}});
 drawNav();render();
-window.__dx={st,go,openDoc,openShare,openCalc,saveSettings};
+window.__dx={st,go,openDoc,openShare,openCalc,saveSettings,openPay,nextInv};
 })();

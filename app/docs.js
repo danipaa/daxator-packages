@@ -20,6 +20,12 @@ const DEF_TPL={
     'Each reel includes 2 revision rounds. Feedback is due within 3 days of delivery.',
     'All amounts are in Pakistani Rupees (PKR).'
   ].join('\n'),
+  customTerms:[
+    '{advance}% advance is due on the invoice date. Work starts once it is received.',
+    'The {balance}% balance is due within {due} days of delivery.',
+    'Payments more than 7 days late pause work until cleared.',
+    'All amounts are in {currency}.'
+  ].join('\n'),
   footer:'Thank you for your business'
 };
 
@@ -77,7 +83,8 @@ document.head.insertAdjacentHTML('beforeend','<style id="docCss">'+CSS+'</style>
 /* ---------- builders ---------- */
 function mk(ctx){
   const B=ctx.biz,T={...DEF_TPL,...(ctx.tpl||{})},W=!!ctx.word;
-  const cur=n=>(T.currency||'Rs')+' '+Math.round(n).toLocaleString('en-US');
+  const usd=ctx.cur==='USD';
+  const cur=n=>usd?'USD '+(+n||0).toLocaleString('en-US',{minimumFractionDigits:(+n||0)%1?2:0,maximumFractionDigits:2}):(T.currency||'Rs')+' '+Math.round(n).toLocaleString('en-US');
   const logo=T.logo||'/assets/logo.png';
   const wrapCls=`doc h-${T.header} f-${T.font}`;
   const wrapStyle=`--acc:${T.accent}`;
@@ -91,7 +98,7 @@ function mk(ctx){
   const fromB=()=>`<div class="lbl">From</div><b>${esc(B.name)}</b><br>${esc(B.owner)}${B.ntn?'<br>NTN: '+esc(B.ntn):''}${B.phone?'<br>'+esc(B.phone):''}${B.email?'<br>'+esc(B.email):''}${B.addr?'<br>'+esc(B.addr):''}`;
   const toB=(c,l)=>`<div class="lbl">${l}</div><b>${esc(c.biz)}</b>${c.person?'<br>'+esc(c.person):''}${c.phone?'<br>'+esc(c.phone):''}${c.email?'<br>'+esc(c.email):''}${c.addr?'<br>'+esc(c.addr):''}`;
   function moneyRows(M){let r=`<tr><td>Subtotal</td><td class="n">${cur(M.gross)}</td></tr>`;
-    if(M.discount)r+=`<tr><td>3 months together (−${M.discPct}%)</td><td class="n">−${cur(M.discount)}</td></tr>`;
+    if(M.discount)r+=`<tr><td>${M.discLabel?esc(M.discLabel):`3 months together (−${M.discPct}%)`}</td><td class="n">−${cur(M.discount)}</td></tr>`;
     if(M.tax)r+=`<tr><td>Sales tax (${M.taxPct}%)</td><td class="n">${cur(M.tax)}</td></tr>`;
     r+=`<tr class="tot"><td>Total</td><td class="n">${cur(M.total)}</td></tr>`;
     if(M.upPct>0&&M.upPct<100)r+=`<tr class="pay"><td>${M.upPct}% advance · due now</td><td class="n">${cur(M.upfront)}</td></tr><tr><td>${100-M.upPct}% balance · on delivery</td><td class="n">${cur(M.balance)}</td></tr>`;
@@ -100,21 +107,30 @@ function mk(ctx){
     <tr><td><b>${esc(p.name)}${p.monthly?' Plan':''}</b> · ${p.monthly?'monthly video production':'one-time video shoot'}<br><span class="small">${esc(period)}</span>
     <ul class="mini">${(p.items||[]).map(i=>'<li>'+esc(i)+'</li>').join('')}</ul></td>
     <td class="n">${p.monthly?M.months+(M.months>1?' months':' month'):'1'}</td><td class="n">${cur(p.price)}</td><td class="n">${cur(M.gross)}</td></tr></table>`}
+  function customTable(d){const L=(d.lines||[]).filter(l=>l.desc||+l.rate);
+    return `<table class="it"><tr><th>Description</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">Amount</th></tr>
+    ${d.title?`<tr><td colspan="4"><b>${esc(d.title)}</b>${d.period?`<br><span class="small">${esc(d.period)}</span>`:''}</td></tr>`:''}
+    ${L.map(l=>`<tr><td>${esc(l.desc||'Item')}</td><td class="n">${+l.qty||0}</td><td class="n">${cur(+l.rate||0)}</td><td class="n">${cur((+l.qty||0)*(+l.rate||0))}</td></tr>`).join('')}</table>`}
+  const items=(d,M)=>d.kind==='custom'?customTable(d):itemTable(d.plan,M,d.period);
   function foot(left){
     const qr=T.showQR&&!W?`<span class="qr"><span>Scan to see<br>our work</span><img src="/assets/qr.png" alt=""></span>`:'';
     return `<div class="ft"><span>${left}</span>${qr}</div>`}
-  return {B,T,W,cur,wrapCls,wrapStyle,cols2,head,fromB,toB,moneyRows,itemTable,foot};
+  return {B,T,W,cur,wrapCls,wrapStyle,cols2,head,fromB,toB,moneyRows,itemTable,items,foot};
 }
 
 function invoice(d,ctx){
   const k=mk(ctx),{B,T}=k,c=d.client,M=d.money;
-  const tok=s=>s.replace(/\{advance\}/g,M.upPct).replace(/\{balance\}/g,100-M.upPct).replace(/\{due\}/g,B.due);
-  let terms=(T.terms||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  const curName=d.currency==='USD'?'US Dollars (USD)':'Pakistani Rupees (PKR)';
+  const tok=s=>s.replace(/\{advance\}/g,M.upPct).replace(/\{balance\}/g,100-M.upPct).replace(/\{due\}/g,B.due).replace(/\{currency\}/g,curName);
+  const src=d.kind==='custom'?(T.customTerms!=null?T.customTerms:DEF_TPL.customTerms):(T.terms||'');
+  let terms=src.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(d.currency==='USD')terms=terms.map(t=>t.replace(/Pakistani Rupees \(PKR\)/g,'{currency}'));
   if(M.upPct>=100)terms=terms.filter(t=>!t.includes('{balance}'));
+  if(M.upPct<=0)terms=terms.filter(t=>!t.includes('{advance}')&&!t.includes('{balance}'));
   if(d.plan.monthly&&d.term===3)terms.splice(Math.min(3,terms.length),0,'The 3-month discount applies only if the full 3-month term is completed.');
   return `<div class="${k.wrapCls}" style="${k.wrapStyle}">${k.head(esc(T.invoiceTitle||'INVOICE'),`No. <b>${esc(d.no)}</b><br>Date: ${fLong(d.date)}<br>Due: ${fLong(d.due)}`)}
   ${k.cols2(k.fromB(),k.toB(c,'Bill to'))}
-  ${k.itemTable(d.plan,M,d.period)}
+  ${k.items(d,M)}
   <table class="sum">${k.moneyRows(M)}</table>
   ${T.showStamp?(d.status==='paid'?'<div class="stamp">Paid in full</div>':d.status==='advance'?'<div class="stamp adv">Advance received</div>':''):''}
   ${T.showPay&&B.pay?`<div class="box"><b>Payment details</b><br>${nl(B.pay)}</div>`:''}
@@ -127,11 +143,12 @@ function quote(d,ctx){
   const k=mk(ctx),{B,T}=k,c=d.client,M=d.money,v=addDays(d.date,7);
   return `<div class="${k.wrapCls}" style="${k.wrapStyle}">${k.head(esc(T.quoteTitle||'QUOTATION'),`${d.no?`No. <b>${esc(d.no)}</b><br>`:''}Date: ${fLong(d.date)}<br>Valid until: ${fLong(v)}`)}
   ${k.cols2(k.fromB(),c.biz?k.toB(c,'Prepared for'):'')}
-  ${k.itemTable(d.plan,M,d.period)}
+  ${k.items(d,M)}
   <table class="sum">${k.moneyRows(M)}</table>
+  ${d.kind==='custom'?(M.upPct>0&&M.upPct<100?`<div class="box">${M.upPct}% advance to start, the remaining ${100-M.upPct}% on delivery.</div>`:''):`
   ${ctx.bonus?`<div class="box"><b>Bonus:</b> ${esc(ctx.bonus)}</div>`:''}
   <div class="box"><b>The Speed Promise:</b> every reel delivered within 24 hours of the shoot. If a reel is late, that reel is free.</div>
-  <h2>HOW IT WORKS</h2><ol class="tm"><li>Free trial reel, delivered the same day</li><li>Confirm the plan and pay the ${M.upPct}% advance</li><li>We lock in shoot dates the same week</li><li>We shoot on-site; reels arrive within 24 hours</li></ol>
+  <h2>HOW IT WORKS</h2><ol class="tm"><li>Free trial reel, delivered the same day</li><li>Confirm the plan and pay the ${M.upPct}% advance</li><li>We lock in shoot dates the same week</li><li>We shoot on-site; reels arrive within 24 hours</li></ol>`}
   ${d.notes?`<div class="box"><b>Notes</b><br>${nl(d.notes)}</div>`:''}
   ${k.foot(`${esc(B.name)} · ${esc(B.owner)}${B.phone?' · '+esc(B.phone):''}${B.ntn?' · NTN '+esc(B.ntn):''}`)}</div>`;
 }
@@ -192,12 +209,12 @@ function agreement(d,ctx){
 const BUILD={invoice,quote,agreement};
 window.DOCS={
   DEF_TPL, CSS,
-  html:(d,ctx)=>BUILD[d.type](d,ctx),
+  html:(d,ctx)=>BUILD[d.type](d,d.currency==='USD'?{...ctx,cur:'USD'}:ctx),
   pageCss:t=>`@page{size:${(t&&t.paper)==='Letter'?'letter':'A4'};margin:12mm}`,
   wordHtml(d,ctx){
     const T={...DEF_TPL,...(ctx.tpl||{})};
     const css=CSS.replace(/var\(--acc\)/g,T.accent).replace(/color-mix\([^)]*\)/g,'#F4EEE8');
-    return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(d.no||d.type)}</title><style>@page{size:${T.paper==='Letter'?'8.5in 11in':'21cm 29.7cm'};margin:2cm}body{margin:0}${css}</style></head><body>${BUILD[d.type](d,{...ctx,word:true})}</body></html>`;
+    return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(d.no||d.type)}</title><style>@page{size:${T.paper==='Letter'?'8.5in 11in':'21cm 29.7cm'};margin:2cm}body{margin:0}${css}</style></head><body>${BUILD[d.type](d,{...ctx,word:true,cur:d.currency==='USD'?'USD':''})}</body></html>`;
   },
   util:{esc,fLong,addDays,monthsLater,ymd}
 };
