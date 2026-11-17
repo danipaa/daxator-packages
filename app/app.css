@@ -320,3 +320,5 @@ main{padding:16px 16px calc(110px + var(--safe-b));max-width:1500px;margin:0 aut
 }
 @media (min-width:1280px){ .rr .hm{display:none} }
 @media (max-width:520px){ #dPrev .tx,#dWord .tx{display:none} #dPrev,#dWord{flex:0 0 auto;padding-left:16px;padding-right:16px} #dSave{flex:1} }
+.upt{font-style:normal;font-size:10px;font-weight:800;background:#E8F7EE;color:#14A800;border-radius:99px;padding:2px 7px;margin-left:4px;vertical-align:1px}
+.rr.up .c-no b{color:#108A00}

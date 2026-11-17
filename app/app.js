@@ -50,7 +50,7 @@ const DEF_PK=[
 ];
 const DEF_RATES={visit:5000,photo:500,film:25000,stories:7500,posting:20000};
 const DEF_COSTS={editor:2000,travel:1500,photo:100,film:8000};
-const DEF_BIZ={name:'Daxator Studios',owner:'Daniyal Murtaza',ntn:'',phone:'+971 58 599 5304',email:'',addr:'Karachi, Pakistan',pay:'',upfront:50,tax:0,due:3,invNext:1,agrNext:1,fx:280};
+const DEF_BIZ={name:'Daxator Studios',owner:'Daniyal Murtaza',ntn:'',phone:'+971 58 599 5304',email:'',addr:'Karachi, Pakistan',pay:'',upfront:50,tax:0,due:3,invNext:1,agrNext:1,fx:280,upFee:10};
 const DEF_BONUS='First 3 restaurants: your first ad film is free';
 const DEF_CALC={base:'growth',reels:12,visits:4,photos:15,films:1,stories:true,posting:false,term:1};
 
@@ -128,8 +128,8 @@ const fxOf=d=>+d.fx||+st.biz.fx||280;
 const inPKR=(d,a)=>isUSD(d)?a*fxOf(d):a, inUSD=(d,a)=>isUSD(d)?a:a/fxOf(d);
 const usd=n=>{n=+n||0;const s=Math.abs(n)<1000&&n%1?2:0;return(n<0?'−$':'$')+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:s,maximumFractionDigits:s})};
 const amt=(d,n)=>isUSD(d)?usd(n):rs(n);
-const recv=d=>d.type!=='invoice'?0:d.status==='paid'?d.money.total:d.status==='advance'?d.money.upfront:0;
-function pays(d){if(d.type!=='invoice')return[];const M=d.money,T=M.total,U=M.upfront;
+const recv=d=>d.type==='upwork'?(d.status==='paid'?d.money.total:0):d.type!=='invoice'?0:d.status==='paid'?d.money.total:d.status==='advance'?d.money.upfront:0;
+function pays(d){if(d.type==='upwork')return d.status==='paid'?[{date:d.paidOn||d.date,a:upNet(d)}]:[];if(d.type!=='invoice')return[];const M=d.money,T=M.total,U=M.upfront;
   if(d.status==='advance')return U?[{date:d.advOn||d.date,a:U}]:[];
   if(d.status==='paid'){if(d.advOn&&U>0&&U<T&&d.advOn!==(d.paidOn||d.date))return[{date:d.advOn,a:U},{date:d.paidOn||d.date,a:T-U}];return[{date:d.paidOn||d.date,a:T}]}
   return[]}
@@ -188,7 +188,7 @@ async function go(v,force){
   view=v;if(location.hash!=='#'+v)history.replaceState(null,'','#'+v);drawNav();render();window.scrollTo({top:0,behavior:'smooth'})}
 document.addEventListener('click',e=>{const n=e.target.closest('#nav [data-v],#tabbar [data-v]');if(n)go(n.dataset.v);
   const a=e.target.closest('[data-act]');if(a)quick(a.dataset.act)});
-function quick(a){if(a==='new-invoice')openDoc({type:'invoice'});if(a==='new-custom')openDoc({type:'invoice',kind:'custom'});if(a==='new-agreement')openDoc({type:'agreement'});if(a==='share')openShare();if(a==='calc')openCalc()}
+function quick(a){if(a==='new-invoice')openDoc({type:'invoice'});if(a==='new-custom')openDoc({type:'invoice',kind:'custom'});if(a==='new-upwork')openUpwork();if(a==='new-agreement')openDoc({type:'agreement'});if(a==='share')openShare();if(a==='calc')openCalc()}
 function render(){const m=$('main');m.onclick=m.oninput=m.onchange=null;m.innerHTML=`<div class="view">${({packages:vPackages,trials:vTrials,clients:vClients,invoices:vInvoices,settings:vSettings})[view]()}</div>`;
   ({packages:wPackages,trials:wTrials,clients:wClients,invoices:wInvoices,settings:wSettings})[view]();$('savebar').classList.toggle('show',view==='settings'&&setDirty())}
 
@@ -396,7 +396,7 @@ function vClients(){
   </div>${wide()?`<div class="detail glass" id="cDet">${selCli&&cliBy(selCli)?cliDetail(cliBy(selCli)):'<div class="empty"><b>Pick a client</b>Their invoices and agreements show here.</div>'}</div>`:''}</div>`}
 function cliRow(c){const ds=st.docs.filter(d=>d.clientId===c.id),iv=ds.filter(d=>d.type==='invoice'),b=iv.reduce((a,d)=>a+inPKR(d,d.money.total),0),g=iv.reduce((a,d)=>a+inPKR(d,recv(d)),0);
   return `<div class="cl glass ${wide()&&selCli===c.id?'on':''}" data-cl="${c.id}"><span class="av">${esc((c.biz||'?').trim().charAt(0).toUpperCase())}</span>
-   <div class="grow"><b>${esc(c.biz)}</b><small>${iv.length} invoice${iv.length===1?'':'s'} · ${ds.length-iv.length} agreement${ds.length-iv.length===1?'':'s'}${c.person?' · '+esc(c.person):''}</small></div>
+   <div class="grow"><b>${esc(c.biz)}</b><small>${[iv.length?iv.length+' invoice'+(iv.length===1?'':'s'):'',ds.filter(d=>d.type==='agreement').length?ds.filter(d=>d.type==='agreement').length+' agreement'+(ds.filter(d=>d.type==='agreement').length===1?'':'s'):'',ds.filter(isUp).length?ds.filter(isUp).length+' Upwork':''].filter(Boolean).join(' · ')||'No documents'}${c.person?' · '+esc(c.person):''}</small></div>
    ${b-g>0.5?`<span class="pill due">Due ${rs(b-g)}</span>`:b?'<span class="pill paid">Paid up</span>':''}</div>`}
 function cliDetail(c){const ds=st.docs.filter(d=>d.clientId===c.id);
   return `<div class="row"><span class="av" style="width:52px;height:52px;font-size:20px">${esc((c.biz||'?').charAt(0).toUpperCase())}</span><div class="grow"><h2>${esc(c.biz)}</h2><div class="muted" style="font-size:13.5px">${[c.person,c.phone,c.email].filter(Boolean).map(esc).join(' · ')||'No contact details yet'}</div></div></div>
@@ -408,7 +408,10 @@ function cliDetail(c){const ds=st.docs.filter(d=>d.clientId===c.id);
     <div class="g2"><label class="fld"><span>Address</span><input class="in" data-cf="addr" value="${esc(c.addr||'')}"></label><label class="fld"><span>NTN</span><input class="in" data-cf="ntn" value="${esc(c.ntn||'')}"></label></div>
     <div class="row" style="margin-top:12px"><button class="btn sm dark" data-csave="${c.id}">Save details</button><button class="btn sm danger" data-cdel="${c.id}">${ic('trash')}Delete client</button></div></details>
   <div class="secl">Documents</div>
-  <div class="doclist">${ds.length?ds.map(d=>{const inv=d.type==='invoice',T=d.money.total;return `<div class="dc"><div class="row"><b class="grow">${esc(d.no)} <span class="muted" style="font-weight:600;font-size:13px">${inv?(d.kind==='custom'?'Custom invoice':'Invoice'):'Agreement'}</span></b><span class="pill ${d.status}">${DSL[d.status]}</span></div>
+  <div class="doclist">${ds.length?ds.map(d=>{const inv=d.type==='invoice',T=d.money.total;if(isUp(d)){const u=d.up||{};return `<div class="dc"><div class="row"><b class="grow">${esc(d.plan.name)} <span class="muted" style="font-weight:600;font-size:13px">Upwork</span></b><span class="pill ${d.status==='paid'?'paid':'advance'}">${stLabel(d)}</span></div>
+    <div class="muted" style="font-size:13px;margin-top:4px">Client paid <b style="color:var(--ink)">${usd(T)}</b> · fee ${u.feePct||0}% · you got ${+u.recvPKR>0?rs(u.recvPKR):usd(upNet(d))}</div>
+    <div class="muted" style="font-size:12.5px;margin-top:2px">${d.start?fLong(d.start)+(d.end?' – '+fLong(d.end):'')+' · ':''}${d.status==='paid'?'Received '+fLong(d.paidOn||d.date):'Still in Upwork'}</div>
+    <div class="acts"><button class="btn sm" data-ue="${d.id}">${ic('edit')}Edit</button><button class="btn sm danger" data-dd="${d.id}">${ic('trash')}</button></div></div>`}return `<div class="dc"><div class="row"><b class="grow">${esc(d.no)} <span class="muted" style="font-weight:600;font-size:13px">${inv?(d.kind==='custom'?'Custom invoice':'Invoice'):'Agreement'}</span></b><span class="pill ${d.status}">${DSL[d.status]}</span></div>
     <div class="muted" style="font-size:13px;margin-top:4px">${esc(d.plan.name)}${d.plan.monthly?' Plan':''} · <b style="color:var(--ink)">${amt(d,T)}</b>${d.plan.monthly&&d.term===3?' (3 months)':''}${inv?` · ${isUSD(d)?'≈ '+rs(inPKR(d,T)):'≈ '+usd(inUSD(d,T))}`:''}</div>
     <div class="muted" style="font-size:12.5px;margin-top:2px">Created ${fLong(d.date)}${inv&&d.status==='paid'?' · Cleared '+fLong(d.paidOn||d.date):''}${inv&&d.advOn&&d.status!=='unpaid'?' · Advance '+fLong(d.advOn):''}</div>
     <div class="acts"><button class="btn sm" data-dp="${d.id}">${ic('eye')}Preview</button><button class="btn sm" data-dpr="${d.id}">${ic('print')}Print</button><button class="btn sm" data-dw="${d.id}">${ic('word')}Word</button>
@@ -439,7 +442,8 @@ async function cliClick(e,m){const t=e.target,g=a=>{const el=t.closest('['+a+']'
   if((v=g('data-dw'))){wordDownload(doc(v),docCtx());return}
   if((v=g('data-ds'))){openPay(doc(v));return}
   if((v=g('data-de'))){m&&m.close();openDoc({docId:v});return}
-  if((v=g('data-dd'))){const d=doc(v);if(await ask('Delete '+esc(d.no)+'?','This can’t be undone. The number won’t be reused.',[{label:'Cancel',value:0},{label:'Delete',value:1,cls:'dark'}])){st.docs=st.docs.filter(x=>x!==d);save();refreshClients();toast('Deleted '+d.no)}}
+  if((v=g('data-ue'))){m&&m.close();openUpwork({docId:v});return}
+  if((v=g('data-dd'))){const d=doc(v);if(await ask('Delete '+esc(isUp(d)?'this Upwork payment':d.no)+'?','This can’t be undone. The number won’t be reused.',[{label:'Cancel',value:0},{label:'Delete',value:1,cls:'dark'}])){st.docs=st.docs.filter(x=>x!==d);save();refreshClients();toast('Deleted '+d.no)}}
 }
 
 /* ---------- document editor ---------- */
@@ -537,7 +541,8 @@ function openDoc(o={}){
     $('dPerL').textContent=c?'Period / reference (optional)':'Period';$('dDiscL').textContent='Discount ('+sym()+')';
     const M=c?moneyC(D):money(p,mon?D.term:1),split=M.upPct>0&&M.upPct<100;
     const sts=D.type==='agreement'?['sent','signed']:['unpaid',...(split||D.status==='advance'?['advance']:[]),'paid'];if(!sts.includes(D.status))D.status=sts[0];
-    $('dStat').innerHTML=sts.map(s=>`<button data-s="${s}" class="${D.status===s?'on':''}">${DSL[s]}</button>`).join('');
+    const sk=sts.join();if($('dStat').dataset.k!==sk){$('dStat').dataset.k=sk;$('dStat').innerHTML=sts.map(s=>`<button data-s="${s}">${DSL[s]}</button>`).join('')}
+    qa('#dStat button',b).forEach(x=>x.classList.toggle('on',x.dataset.s===D.status));
     $('fAdvOn').classList.toggle('hidden',!inv||!split||D.status==='unpaid');$('fPaidOn').classList.toggle('hidden',!inv||D.status!=='paid');
     if(!c&&!D.periodTouched&&$('dDate').value)$('dPeriod').value=periodOf(p,mon?D.term:1,$('dDate').value);
     const fx=+$('dFx').value||+st.biz.fx||280,cu=c?D.cur:'PKR',other=cu==='USD'?'≈ '+rs(M.total*fx):'≈ '+usd(M.total/fx);
@@ -609,62 +614,132 @@ function openPay(d){
       save();m.close();refreshClients();toast(d.no+': '+DSL[s]+' ✓')}};
   draw()}
 
+/* =================== UPWORK PAYMENTS =================== */
+const isUp=d=>d.type==='upwork';
+const upNet=d=>{const u=d.up||{};return +u.recvPKR>0?(+u.recvPKR)/fxOf(d):Math.max(0,d.money.total-(+u.fee||0)-(+u.cut||0))};
+const stLabel=d=>isUp(d)?(d.status==='paid'?'Received':'Pending'):DSL[d.status];
+function nextUpw(){let mx=0;st.docs.forEach(d=>{if(!isUp(d))return;const m=String(d.no||'').match(/(\d+)$/);if(m)mx=Math.max(mx,+m[1])});return 'UPW-'+pad3(mx+1)}
+function openUpwork(o={}){
+  const E=o.docId?st.docs.find(d=>d.id===o.docId):null,u=E?.up||{};let status=E?E.status:'paid';
+  const nf=n=>n===''||n==null?'':+n;
+  const m=modal({title:E?'Edit Upwork payment':'Add Upwork payment',size:'lg',body:`
+    <p class="muted" style="margin:12px 0 0;font-size:13.5px;line-height:1.5">For work paid through Upwork. It doesn’t use your DAX numbers, but what reaches you counts in your earnings.</p>
+    <div class="g2"><label class="fld"><span>Client *</span><input class="in" id="uCli" list="uCl" autocomplete="off" placeholder="e.g. Daxtel"></label>
+      <label class="fld"><span>Project *</span><input class="in" id="uPrj" placeholder="e.g. Jungle Tokyo LED animation"></label>
+      <label class="fld"><span>Work started</span><input class="in" id="uS" type="date"></label><label class="fld"><span>Work finished</span><input class="in" id="uE" type="date"></label>
+      <label class="fld"><span>Payment received on *</span><input class="in" id="uD" type="date"></label><label class="fld"><span>Upwork contract / ref (optional)</span><input class="in" id="uRef"></label></div>
+    <datalist id="uCl">${st.clients.map(c=>`<option value="${esc(c.biz)}">`).join('')}</datalist>
+    <div class="secl">Money</div>
+    <div class="g2"><label class="fld"><span>Client paid ($) *</span><input class="in" id="uG" type="number" inputmode="decimal" min="0" step="any" placeholder="What you charged"></label>
+      <label class="fld"><span>Upwork fee %</span><input class="in" id="uP" type="number" inputmode="decimal" min="0" max="100" step="any"></label>
+      <label class="fld"><span>Upwork fee ($)</span><input class="in" id="uF" type="number" inputmode="decimal" min="0" step="any"></label>
+      <label class="fld"><span>Withdrawal / bank cut ($)</span><input class="in" id="uC" type="number" inputmode="decimal" min="0" step="any" placeholder="0"></label>
+      <label class="fld"><span>Received in bank (Rs, optional)</span><input class="in" id="uR" type="number" inputmode="decimal" min="0" step="any" placeholder="Exact amount that hit your account"></label>
+      <label class="fld"><span>USD rate · 1 USD = PKR</span><span class="fxrow"><input class="in" id="uX" type="number" inputmode="decimal" min="1" step="any"><button type="button" class="btn sm" id="uXg">Today’s rate</button></span></label></div>
+    <div class="secl">Status</div><div class="seg" id="uSt" style="width:100%;margin-top:8px"><button data-s="paid">Received</button><button data-s="unpaid">Still in Upwork</button></div>
+    <label class="fld"><span>Notes (optional)</span><textarea class="in" id="uN" style="min-height:56px"></textarea></label>
+    <div class="sumbox" id="uSum"></div>`,
+    foot:`${E?`<button class="btn danger" id="uDel" style="flex:0 0 auto">${ic('trash')}</button>`:''}<button class="btn" id="uX0">Cancel</button><button class="btn dark" id="uSave">${ic('check')}${E?'Update':'Save'}</button>`});
+  const v=id=>$(id).value;
+  $('uCli').value=E?E.client.biz:(o.client||'');$('uPrj').value=E?E.plan.name:'';$('uS').value=E?.start||'';$('uE').value=E?.end||'';$('uD').value=E?(E.paidOn||E.date):today();$('uRef').value=u.ref||'';
+  $('uG').value=E?E.money.total:'';$('uP').value=E?nf(u.feePct):(+st.biz.upFee||10);$('uF').value=E?nf(u.fee):'';$('uC').value=E?nf(u.cut)||'':'';$('uR').value=E&&+u.recvPKR?u.recvPKR:'';
+  $('uX').value=E?fxOf(E):(+st.biz.fx||280);$('uN').value=E?.notes||'';
+  const r2=n=>Math.round(n*100)/100;
+  function calc(){const g=+v('uG')||0,f=+v('uF')||0,c=+v('uC')||0,R=+v('uR')||0,x=+v('uX')||280;const net=R>0?R/x:Math.max(0,g-f-c);
+    return{g,f,c,R,x,net,pct:g?f/g*100:0,keep:g?net/g*100:0}}
+  function sum(){const k=calc();qa('#uSt button',m.el).forEach(b=>b.classList.toggle('on',b.dataset.s===status));
+    $('uSum').innerHTML=k.g?`Client paid <b>${usd(k.g)}</b> → Upwork fee <b>${usd(k.f)}</b> (${r2(k.pct)}%)${k.c?` → bank cut <b>${usd(k.c)}</b>`:''}<br>You got <b>${k.R>0?rs(k.R)+'</b> ≈ '+usd(k.net):usd(k.net)+'</b> ≈ '+rs(k.net*k.x)} · <span class="muted">you kept ${Math.round(k.keep)}%</span>`:'<span class="muted">Enter what the client paid to see what reached you.</span>'}
+  m.body.addEventListener('input',e=>{const id=e.target.id,g=+v('uG')||0;
+    if(id==='uG'||id==='uP'){if(v('uP')!=='')$('uF').value=r2(g*(+v('uP')||0)/100)}
+    if(id==='uF'){$('uP').value=g?r2((+v('uF')||0)/g*100):''}
+    sum()});
+  m.body.addEventListener('click',async e=>{const s=e.target.closest('#uSt [data-s]');if(s){status=s.dataset.s;sum()}
+    if(e.target.closest('#uXg')){const b=$('uXg');b.disabled=true;b.textContent='…';try{$('uX').value=await liveRate();sum()}catch(er){toast('Couldn’t get the live rate. Type it in.')}b.disabled=false;b.textContent='Today’s rate'}});
+  if(!E&&$('uG').value==='')$('uF').value='';
+  $('uX0').onclick=()=>m.close();
+  if($('uDel'))$('uDel').onclick=async()=>{if(await ask('Delete this Upwork payment?','This can’t be undone.',[{label:'Cancel',value:0},{label:'Delete',value:1,cls:'dark'}])){st.docs=st.docs.filter(x=>x!==E);save();m.close();refreshClients();toast('Deleted')}};
+  $('uSave').onclick=()=>{const k=calc(),cli=v('uCli').trim(),prj=v('uPrj').trim(),date=v('uD')||today();
+    if(!cli){toast('Add the client');$('uCli').focus();return}if(!prj){toast('Add the project');$('uPrj').focus();return}if(!(k.g>0)){toast('Add what the client paid');$('uG').focus();return}
+    let c=st.clients.find(x=>x.biz.toLowerCase()===cli.toLowerCase());if(!c){c={id:uid(),biz:cli,source:'Upwork',created:new Date().toISOString()};st.clients.push(c)}
+    const d={type:'upwork',kind:'upwork',clientId:c.id,client:{biz:c.biz,person:c.person||'',phone:c.phone||'',email:c.email||'',addr:c.addr||''},
+      plan:{id:'upwork',name:prj,monthly:false,price:k.g,items:[]},term:1,currency:'USD',fx:k.x,date,start:v('uS'),end:v('uE'),status,paidOn:status==='paid'?date:'',notes:v('uN').trim(),
+      money:{months:1,gross:k.g,rate:k.g,discount:0,discPct:0,net:k.g,taxPct:0,tax:0,total:k.g,upPct:0,upfront:0,balance:k.g},
+      up:{ref:v('uRef').trim(),feePct:r2(k.pct),fee:k.f,cut:k.c,recvPKR:k.R}};
+    if(E){Object.assign(E,d,{updated:new Date().toISOString()})}else{d.id=uid();d.no=nextUpw();d.created=new Date().toISOString();st.docs.unshift(d)}
+    save();m.close();refreshClients();toast((E?'Updated':'Added')+' Upwork payment ✓')};
+  sum()}
+
 /* =================== INVOICES & EARNINGS =================== */
-let iYear=String(new Date().getFullYear()),iQ='',iF='all';
+let iYear=String(new Date().getFullYear()),iQ='',iF='all',iSrc='all';
 const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const fS=s=>{if(!s)return'';const[y,mo,x]=s.split('-');return new Date(+y,+mo-1,+x).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})};
+const fM=s=>{if(!s)return'';const[y,mo]=s.split('-');return MON[+mo-1]+' '+y};
+const workSpan=(a,b)=>{if(!a||!b||fM(a)===fM(b))return fM(a||b);const[ya,ma]=a.split('-'),[yb,mb]=b.split('-');return ya===yb?MON[+ma-1]+'–'+MON[+mb-1]+' '+yb:fM(a)+' – '+fM(b)};
 const kfmt=n=>{const u=st.dcur==='USD',a=Math.abs(n),p=u?'$':'';return a>=1e6?p+(n/1e6).toFixed(a>=1e7?0:1).replace(/\.0$/,'')+'M':a>=1e3?p+(n/1e3).toFixed(a>=1e5?0:1).replace(/\.0$/,'')+'k':p+Math.round(n)};
+const dueOf=d=>isUp(d)?(d.status==='paid'?0:upNet(d)):d.money.total-recv(d);
 function invData(){
-  const inv=st.docs.filter(d=>d.type==='invoice'),U=st.dcur==='USD',cv=(d,a)=>U?inUSD(d,a):inPKR(d,a),cvo=(d,a)=>U?inPKR(d,a):inUSD(d,a);
+  const inv=st.docs.filter(d=>(d.type==='invoice'&&iSrc!=='upwork')||(isUp(d)&&iSrc!=='studio')),U=st.dcur==='USD',cv=(d,a)=>U?inUSD(d,a):inPKR(d,a),cvo=(d,a)=>U?inPKR(d,a):inUSD(d,a);
   const pe=[];inv.forEach(d=>pays(d).forEach(p=>pe.push({d,date:p.date,v:cv(d,p.a),o:cvo(d,p.a)})));
-  const years=new Set([String(new Date().getFullYear())]);inv.forEach(d=>d.date&&years.add(d.date.slice(0,4)));pe.forEach(p=>p.date&&years.add(p.date.slice(0,4)));
+  const years=new Set([String(new Date().getFullYear())]);st.docs.forEach(d=>(d.type==='invoice'||isUp(d))&&d.date&&years.add(d.date.slice(0,4)));pe.forEach(p=>p.date&&years.add(p.date.slice(0,4)));
   const Y=[...years].sort().reverse(),inY=s=>iYear==='all'||(s||'').slice(0,4)===iYear;
   const sum=(a,f)=>a.reduce((x,y)=>x+f(y),0);
-  const earnedP=pe.filter(p=>inY(p.date)),billedI=inv.filter(d=>inY(d.date));
+  const earnedP=pe.filter(p=>inY(p.date)),billedI=inv.filter(d=>inY(d.date)),upI=billedI.filter(isUp);
   return{inv,pe,Y,inY,cv,cvo,U,
     earned:sum(earnedP,p=>p.v),earnedO:sum(earnedP,p=>p.o),all:sum(pe,p=>p.v),allO:sum(pe,p=>p.o),
     billed:sum(billedI,d=>cv(d,d.money.total)),billedO:sum(billedI,d=>cvo(d,d.money.total)),
-    due:sum(billedI,d=>cv(d,d.money.total-recv(d))),dueO:sum(billedI,d=>cvo(d,d.money.total-recv(d))),
+    due:sum(billedI,d=>cv(d,dueOf(d))),dueO:sum(billedI,d=>cvo(d,dueOf(d))),
+    upFee:sum(upI,d=>cv(d,+d.up?.fee||0)),upCut:sum(upI,d=>cv(d,+d.up?.cut||0)),upGross:sum(upI,d=>cv(d,d.money.total)),upGrossUSD:sum(upI,d=>d.money.total),upFeeUSD:sum(upI,d=>+d.up?.fee||0),
     count:billedI.length,unpaidN:billedI.filter(d=>d.status!=='paid').length,earnedP,billedI}}
-function vInvoices(){const X=invData(),fm=n=>X.U?usd(n):rs(n),fo=n=>X.U?rs(n):usd(n);
-  // chart buckets
+function vInvoices(){const X=invData(),fm=n=>X.U?usd(n):rs(n),fo=n=>X.U?rs(n):usd(n),UP=iSrc==='upwork';
   let buckets;
   if(iYear==='all'){const ys=X.Y.slice().reverse();buckets=ys.map(y=>({l:y,e:0,b:0,k:y}))}else buckets=MON.map((l,i)=>({l,e:0,b:0,k:iYear+'-'+String(i+1).padStart(2,'0')}));
   const bk=s=>iYear==='all'?(s||'').slice(0,4):(s||'').slice(0,7);
   X.earnedP.forEach(p=>{const b=buckets.find(x=>x.k===bk(p.date));if(b)b.e+=p.v});X.billedI.forEach(d=>{const b=buckets.find(x=>x.k===bk(d.date));if(b)b.b+=X.cv(d,d.money.total)});
   const mx=Math.max(1,...buckets.map(b=>Math.max(b.e,b.b)));
-  // top clients
-  const tc={};X.earnedP.forEach(p=>{const k=p.d.clientId||p.d.client.biz;tc[k]=tc[k]||{n:(cliBy(p.d.clientId)||p.d.client).biz,v:0};tc[k].v+=p.v});
+  const tc={};X.earnedP.forEach(p=>{const k=p.d.clientId||p.d.client.biz;tc[k]=tc[k]||{n:(cliBy(p.d.clientId)||p.d.client).biz,v:0,up:false};tc[k].v+=p.v;if(isUp(p.d))tc[k].up=true});
   const tops=Object.values(tc).sort((a,b)=>b.v-a.v).slice(0,5),tmx=Math.max(1,...tops.map(t=>t.v));
-  // register
   const q=iQ.toLowerCase();
-  const list=X.inv.filter(d=>X.inY(d.date)&&(iF==='all'||(iF==='open'?d.status!=='paid':d.status===iF))&&(!q||[d.no,d.client.biz,d.plan.name,d.title].join(' ').toLowerCase().includes(q)))
+  const list=X.inv.filter(d=>X.inY(d.date)&&(iF==='all'||(iF==='open'?d.status!=='paid':d.status===iF))&&(!q||[d.no,d.client.biz,d.plan.name,d.title,d.up?.ref].join(' ').toLowerCase().includes(q)))
     .sort((a,b)=>(b.date||'').localeCompare(a.date||'')||String(b.no).localeCompare(String(a.no),undefined,{numeric:true}));
-  const per=iYear==='all'?'all time':iYear;
-  return `<div class="ph"><div><h1>Invoices</h1><p>Every invoice you’ve made, what’s been paid, and what you’ve earned.</p></div><div class="acts">
-    <button class="btn" data-act="new-custom">${ic('edit')}Custom invoice</button><button class="btn dark" data-act="new-invoice">${ic('box')}Package invoice</button></div></div>
-  <div class="ibar"><div class="chips" style="margin:0">${['all',...X.Y].map(y=>`<button class="chip ${iYear===y?'on':''}" data-y="${y}">${y==='all'?'All time':y===String(new Date().getFullYear())?'This year · '+y:y===String(new Date().getFullYear()-1)?'Last year · '+y:y}</button>`).join('')}</div>
-    <div class="seg" id="iCur"><button data-cur="PKR" class="${X.U?'':'on'}">PKR</button><button data-cur="USD" class="${X.U?'on':''}">USD</button></div></div>
-  <div class="stats stagger"><div class="stat hl glass"><small>Earned · ${per}</small><b data-cu="${X.earned}">${fm(X.earned)}</b><span class="alt">≈ ${fo(X.earnedO)}</span></div>
-    <div class="stat glass"><small>Billed · ${per}</small><b data-cu="${X.billed}">${fm(X.billed)}</b><span class="alt">${X.count} invoice${X.count===1?'':'s'}</span></div>
+  const per=iYear==='all'?'all time':iYear,avgFee=X.upGrossUSD?Math.round(X.upFeeUSD/X.upGrossUSD*1000)/10:0;
+  const stats=UP?`<div class="stat hl glass"><small>Received from Upwork · ${per}</small><b data-cu="${X.earned}">${fm(X.earned)}</b><span class="alt">≈ ${fo(X.earnedO)} · after all cuts</span></div>
+    <div class="stat glass"><small>Clients paid · ${per}</small><b data-cu="${X.upGross}">${fm(X.upGross)}</b><span class="alt">${X.count} payment${X.count===1?'':'s'}</span></div>
+    <div class="stat glass"><small>Upwork fees</small><b data-cu="${X.upFee}">${fm(X.upFee)}</b><span class="alt">avg ${avgFee}% of what clients paid</span></div>
+    <div class="stat glass"><small>Withdrawal / bank cuts</small><b data-cu="${X.upCut}">${fm(X.upCut)}</b><span class="alt">${X.upGross?'you kept '+Math.round(X.earned/X.upGross*100)+'%':'—'}</span></div>`
+   :`<div class="stat hl glass"><small>Earned · ${per}</small><b data-cu="${X.earned}">${fm(X.earned)}</b><span class="alt">≈ ${fo(X.earnedO)}</span></div>
+    <div class="stat glass"><small>Billed · ${per}</small><b data-cu="${X.billed}">${fm(X.billed)}</b><span class="alt">${X.count} ${iSrc==='all'?'record':'invoice'}${X.count===1?'':'s'}</span></div>
     <div class="stat glass"><small>Still to collect</small><b data-cu="${X.due}">${fm(X.due)}</b><span class="alt">${X.unpaidN} not fully paid</span></div>
-    <div class="stat glass"><small>All-time earned</small><b data-cu="${X.all}">${fm(X.all)}</b><span class="alt">≈ ${fo(X.allO)}</span></div></div>
-  <div class="igrid"><div class="chart glass"><div class="row"><h3 class="grow">${iYear==='all'?'Earnings by year':'Earnings by month · '+iYear}</h3><span class="lg"><i class="b"></i>Billed</span><span class="lg"><i class="e"></i>Earned</span></div>
-      <div class="bars">${buckets.map(b=>`<div class="bar" title="${b.l}: earned ${fm(b.e)} · billed ${fm(b.b)}"><span class="bb" data-k="${b.b/mx}"></span><span class="be" data-k="${b.e/mx}"></span>${b.e?`<span class="bv" style="--k:${b.e/mx}">${kfmt(b.e)}</span>`:''}<span class="bl">${b.l}</span></div>`).join('')}</div></div>
-    <div class="tops glass"><h3>Top clients · ${per}</h3>${tops.length?tops.map(t=>`<div class="tc"><div class="r"><span>${esc(t.n)}</span><span>${fm(t.v)}</span></div><div class="tr"><i data-w="${t.v/tmx}"></i></div></div>`).join(''):'<p class="muted" style="font-size:13.5px;margin-top:12px">No payments received in this period yet.</p>'}</div></div>
-  <div class="toolbar"><div class="search">${ic('search')}<input class="in" id="iQ" placeholder="Search number, client or project…" value="${esc(iQ)}"></div>
-    <button class="btn" id="iCsv">${ic('down')}CSV</button></div>
-  <div class="chips">${[['all','All'],['open','Not paid yet'],['unpaid','Unpaid'],['advance','Advance paid'],['paid','Paid']].map(([k,l])=>`<button class="chip ${iF===k?'on':''}" data-f="${k}">${l}</button>`).join('')}</div>
-  <p class="muted" style="font-size:12.5px;margin:0 0 10px">Next invoice number: <b>${nextInv()}</b> · ${list.length} shown</p>
-  <div class="reg">${list.length?`<div class="rh"><span>No.</span><span>Client</span><span>Created</span><span>Cleared</span><span>Status</span><span style="text-align:right">Amount</span><span></span></div>`+list.map(d=>{const T=d.money.total;
-      return `<div class="rr glass"><div class="c-no"><b>${esc(d.no)}</b><small>${d.kind==='custom'?'Custom':'Package'}${isUSD(d)?' · USD':''}</small></div>
+    <div class="stat glass"><small>All-time earned</small><b data-cu="${X.all}">${fm(X.all)}</b><span class="alt">≈ ${fo(X.allO)}</span></div>`;
+  const row=d=>{const T=d.money.total;
+    if(isUp(d)){const u=d.up||{},n=upNet(d);return `<div class="rr glass up"><div class="c-no"><b>Upwork</b><small>${esc(u.ref||d.no)}</small></div>
+      <div class="c-cl"><b>${esc(d.client.biz)}</b><small>${esc(d.plan.name)}</small></div>
+      <div class="c-dt"><small class="lbl2">Work</small>${d.start||d.end?workSpan(d.start,d.end):'<span class="muted">—</span>'}</div>
+      <div class="c-cd"><small class="lbl2">Received</small>${d.status==='paid'?fS(d.paidOn||d.date):'<span class="muted">—</span>'}</div>
+      <div class="c-st"><span class="pill ${d.status==='paid'?'paid':'advance'}">${stLabel(d)}</span></div>
+      <div class="c-am"><b>${usd(T)}</b><small>got ${+u.recvPKR>0?rs(u.recvPKR):rs(inPKR(d,n))} · ${u.feePct||0}% fee</small></div>
+      <div class="c-ac"><button class="btn sm" data-ue="${d.id}">${ic('edit')}<span class="hm">Edit</span></button><button class="btn sm danger" data-dd="${d.id}" aria-label="Delete">${ic('trash')}</button></div></div>`}
+    return `<div class="rr glass"><div class="c-no"><b>${esc(d.no)}</b><small>${d.kind==='custom'?'Custom':'Package'}${isUSD(d)?' · USD':''}</small></div>
       <div class="c-cl"><b>${esc(d.client.biz)}</b><small>${esc(d.plan.name)}${d.plan.monthly?' Plan':''}${d.plan.monthly&&d.term===3?' · 3 months':''}</small></div>
       <div class="c-dt"><small class="lbl2">Created</small>${fS(d.date)}</div>
       <div class="c-cd"><small class="lbl2">Cleared</small>${d.status==='paid'?fS(d.paidOn||d.date):d.status==='advance'&&d.advOn?'<span class="muted">Adv. '+fS(d.advOn)+'</span>':'<span class="muted">—</span>'}</div>
       <div class="c-st"><span class="pill ${d.status}">${DSL[d.status]}</span></div>
       <div class="c-am"><b>${amt(d,T)}</b><small>${isUSD(d)?'≈ '+rs(inPKR(d,T)):'≈ '+usd(inUSD(d,T))}</small></div>
-      <div class="c-ac"><button class="btn sm" data-dp="${d.id}" aria-label="Preview">${ic('eye')}<span class="hm">Preview</span></button><button class="btn sm" data-ds="${d.id}">Payment</button><button class="btn sm" data-de="${d.id}" aria-label="Edit">${ic('edit')}</button><button class="btn sm danger" data-dd="${d.id}" aria-label="Delete">${ic('trash')}</button></div></div>`}).join('')
-    :`<div class="empty glass card"><b>${X.inv.length?'Nothing here':'No invoices yet'}</b>${X.inv.length?'Try another year or filter.':'Create a package or custom invoice. You can also add your old invoices with their real dates and numbers, and they’ll count in your earnings.'}</div>`}</div>`}
+      <div class="c-ac"><button class="btn sm" data-dp="${d.id}" aria-label="Preview">${ic('eye')}<span class="hm">Preview</span></button><button class="btn sm" data-ds="${d.id}">Payment</button><button class="btn sm" data-de="${d.id}" aria-label="Edit">${ic('edit')}</button><button class="btn sm danger" data-dd="${d.id}" aria-label="Delete">${ic('trash')}</button></div></div>`};
+  return `<div class="ph"><div><h1>Invoices</h1><p>Every invoice and Upwork payment, what’s been paid, and what you’ve earned.</p></div><div class="acts">
+    <button class="btn" data-act="new-upwork">${ic('plus')}Upwork payment</button><button class="btn" data-act="new-custom">${ic('edit')}Custom invoice</button><button class="btn dark" data-act="new-invoice">${ic('box')}Package invoice</button></div></div>
+  <div class="ibar"><div class="chips" style="margin:0">${['all',...X.Y].map(y=>`<button class="chip ${iYear===y?'on':''}" data-y="${y}">${y==='all'?'All time':y===String(new Date().getFullYear())?'This year · '+y:y===String(new Date().getFullYear()-1)?'Last year · '+y:y}</button>`).join('')}</div>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><div class="seg" id="iSrc"><button data-src="all" class="${iSrc==='all'?'on':''}">All</button><button data-src="studio" class="${iSrc==='studio'?'on':''}">Studio</button><button data-src="upwork" class="${UP?'on':''}">Upwork</button></div>
+    <div class="seg" id="iCur"><button data-cur="PKR" class="${X.U?'':'on'}">PKR</button><button data-cur="USD" class="${X.U?'on':''}">USD</button></div></div></div>
+  <div class="stats stagger">${stats}</div>
+  <div class="igrid"><div class="chart glass"><div class="row"><h3 class="grow">${iYear==='all'?'Earnings by year':'Earnings by month · '+iYear}</h3><span class="lg"><i class="b"></i>${UP?'Clients paid':'Billed'}</span><span class="lg"><i class="e"></i>${UP?'Received':'Earned'}</span></div>
+      <div class="bars">${buckets.map(b=>`<div class="bar" title="${b.l}: earned ${fm(b.e)} · billed ${fm(b.b)}"><span class="bb" data-k="${b.b/mx}"></span><span class="be" data-k="${b.e/mx}"></span>${b.e?`<span class="bv" style="--k:${b.e/mx}">${kfmt(b.e)}</span>`:''}<span class="bl">${b.l}</span></div>`).join('')}</div></div>
+    <div class="tops glass"><h3>Top clients · ${per}</h3>${tops.length?tops.map(t=>`<div class="tc"><div class="r"><span>${esc(t.n)}${t.up&&!UP?' <em class="upt">Upwork</em>':''}</span><span>${fm(t.v)}</span></div><div class="tr"><i data-w="${t.v/tmx}"></i></div></div>`).join(''):'<p class="muted" style="font-size:13.5px;margin-top:12px">No payments received in this period yet.</p>'}</div></div>
+  <div class="toolbar"><div class="search">${ic('search')}<input class="in" id="iQ" placeholder="Search number, client or project…" value="${esc(iQ)}"></div>
+    <button class="btn" id="iCsv">${ic('down')}CSV</button></div>
+  <div class="chips">${(UP?[['all','All'],['paid','Received'],['unpaid','Still in Upwork']]:[['all','All'],['open','Not paid yet'],['unpaid','Unpaid'],['advance','Advance paid'],['paid','Paid']]).map(([k,l])=>`<button class="chip ${iF===k?'on':''}" data-f="${k}">${l}</button>`).join('')}</div>
+  <p class="muted" style="font-size:12.5px;margin:0 0 10px">${UP?'Upwork payments don’t use DAX numbers':'Next invoice number: <b>'+nextInv()+'</b>'} · ${list.length} shown</p>
+  <div class="reg">${list.length?`<div class="rh"><span>No.</span><span>Client</span><span>${UP?'Work period':'Created'}</span><span>${UP?'Received':'Cleared'}</span><span>Status</span><span style="text-align:right">Amount</span><span></span></div>`+list.map(row).join('')
+    :`<div class="empty glass card"><b>${X.inv.length?'Nothing here':UP?'No Upwork payments yet':'No invoices yet'}</b>${X.inv.length?'Try another year or filter.':UP?'Tap “Upwork payment” to add what a client paid and what reached you.':'Create a package or custom invoice. You can also add your old invoices with their real dates and numbers, and they’ll count in your earnings.'}</div>`}</div>`}
 function wInvoices(){
   qa('[data-cu]').forEach(el=>{const v=+el.dataset.cu;el.dataset.v=0;countUp(el,v,st.dcur==='USD'?usd:rs,800)});
   requestAnimationFrame(()=>requestAnimationFrame(()=>{qa('.bars [data-k]').forEach(el=>el.style.setProperty('--k',el.dataset.k));qa('.tc [data-w]').forEach(el=>el.style.width=(+el.dataset.w*100)+'%')}));
@@ -673,13 +748,15 @@ function wInvoices(){
   $('main').onclick=e=>{const t=e.target;let x;
     if((x=t.closest('[data-y]'))){iYear=x.dataset.y;render();return}
     if((x=t.closest('[data-f]'))){iF=x.dataset.f;render();return}
+    if((x=t.closest('[data-src]'))){iSrc=x.dataset.src;iF='all';render();return}
     if((x=t.closest('[data-cur]'))){st.dcur=x.dataset.cur;save();render();return}
     cliClick(e,null)}}
-function exportInvCsv(){const inv=st.docs.filter(d=>d.type==='invoice');if(!inv.length){toast('No invoices yet');return}
+function exportInvCsv(){const inv=st.docs.filter(d=>d.type==='invoice'||isUp(d));if(!inv.length){toast('No invoices yet');return}
   const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"',r2=n=>Math.round(n*100)/100;
-  const cols=['Invoice','Type','Created','Due','Client','Contact','Phone','Item / plan','Currency','Total','USD rate','Total PKR','Total USD','Advance','Status','Advance received on','Cleared on','Received PKR','Received USD','Outstanding PKR'];
-  dl(today()+'-invoices.csv','﻿'+[cols.join(',')].concat(inv.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(d=>{const T=d.money.total,R=recv(d);
-    return[d.no,d.kind==='custom'?'Custom':'Package',d.date,d.due,d.client.biz,d.client.person,d.client.phone,d.plan.name+(d.plan.monthly&&d.term===3?' (3 months)':''),d.currency||'PKR',T,fxOf(d),Math.round(inPKR(d,T)),r2(inUSD(d,T)),d.money.upfront,DSL[d.status],d.advOn||'',d.status==='paid'?(d.paidOn||d.date):'',Math.round(inPKR(d,R)),r2(inUSD(d,R)),Math.round(inPKR(d,T-R))].map(q).join(',')})).join('\n'),'text/csv');toast('Invoices CSV downloaded')}
+  const cols=['Number','Type','Date','Due','Client','Contact','Phone','Item / project','Work from','Work to','Currency','Total (client paid)','USD rate','Total PKR','Total USD','Upwork fee %','Upwork fee $','Bank cut $','Status','Advance received on','Cleared / received on','Received PKR','Received USD','Outstanding PKR'];
+  dl(today()+'-invoices-and-upwork.csv','﻿'+[cols.join(',')].concat(inv.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(d=>{const T=d.money.total,up=isUp(d),u=d.up||{};
+    const R=up?(d.status==='paid'?upNet(d):0):recv(d);
+    return[up?(u.ref||d.no):d.no,up?'Upwork':d.kind==='custom'?'Custom':'Package',d.date,up?'':d.due,d.client.biz,d.client.person,d.client.phone,d.plan.name+(d.plan.monthly&&d.term===3?' (3 months)':''),d.start||'',d.end||'',d.currency||'PKR',T,fxOf(d),Math.round(inPKR(d,T)),r2(inUSD(d,T)),up?u.feePct:'',up?u.fee:'',up?(u.cut||0):'',stLabel(d),d.advOn||'',d.status==='paid'?(d.paidOn||d.date):'',up&&+u.recvPKR>0?u.recvPKR:Math.round(inPKR(d,R)),r2(inUSD(d,R)),Math.round(inPKR(d,dueOf(d)))].map(q).join(',')})).join('\n'),'text/csv');toast('CSV downloaded')}
 
 /* =================== SETTINGS (draft + Save) =================== */
 let draft=null,base='';
@@ -712,6 +789,7 @@ function vSettings(){
     <div class="g2">${f('biz.invNext','Start invoice numbers from','number','min="1"')}${f('biz.agrNext','Start agreement numbers from','number','min="1"')}</div>
     <p class="muted" style="font-size:12.5px">Next: <b id="nInv">${invNo(Math.max(+B.invNext||1,nextNum('invoice')))}</b> · <b id="nAgr">${agrNo(Math.max(+B.agrNext||1,nextNum('agreement')))}</b>. The app always skips numbers you’ve already used.</p>
     <label class="fld"><span>Dollar rate · 1 USD = PKR</span><span class="fxrow"><input class="in" data-d="biz.fx" type="number" inputmode="decimal" step="any" min="1" value="${esc(B.fx)}"><button type="button" class="btn sm" id="sFxGet">Today’s rate</button></span></label>
+    ${f('biz.upFee','Usual Upwork fee %','number','step="any" min="0" max="100"')}
     <p class="muted" style="font-size:12px;margin:6px 0 0">Used to show PKR and USD side by side. Each invoice keeps the rate from the day you made it.</p></section>
 
   <section class="sc glass" id="s-pk"><h3>Packages</h3><p class="muted">Total = reels × per reel + shoots + photos + ad films + extras. Type a total to work out the per-reel price.</p>
@@ -764,7 +842,7 @@ function vSettings(){
   </div>`}
 function getP(o,p){return p.split('.').reduce((a,k)=>a==null?a:a[k],o)}
 function setP(o,p,v){const ks=p.split('.');let a=o;ks.slice(0,-1).forEach(k=>a=a[k]);a[ks[ks.length-1]]=v}
-const NUMS=/^(biz\.(upfront|tax|due|invNext|agrNext|fx)|disc3|rates\.|costs\.|pk\.\d+\.(per|reels|visits|photos|films))/;
+const NUMS=/^(biz\.(upfront|tax|due|invNext|agrNext|fx|upFee)|disc3|rates\.|costs\.|pk\.\d+\.(per|reels|visits|photos|films))/;
 let tpvType='invoice',tpvT;
 function sampleDoc(type){const S=draft,p=snapPkg('growth',S),date=today(),M=money(p,1,S);
   return{type,no:type==='invoice'?invNo(S.biz.invNext):type==='agreement'?agrNo(S.biz.agrNext):'',plan:p,term:1,money:M,date,due:addDays(date,+S.biz.due||3),start:addDays(date,1),
@@ -828,5 +906,5 @@ const h=location.hash.slice(1);if(VIEWS.some(v=>v[0]===h))view=h;
 addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(VIEWS.some(x=>x[0]===v)&&v!==view)go(v)});
 let lastWide=wide();addEventListener('resize',()=>{const w=wide();if(w!==lastWide){lastWide=w;if(view==='clients')render()}});
 drawNav();render();
-window.__dx={st,go,openDoc,openShare,openCalc,saveSettings,openPay,nextInv};
+window.__dx={st,go,openDoc,openShare,openCalc,saveSettings,openPay,nextInv,openUpwork};
 })();
