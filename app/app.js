@@ -91,11 +91,26 @@ function stamp(){const now=Date.now(),seen={};st.del=st.del||{};
     if(!sy.init){if(!r._t)r._t=Date.parse(r.updated||r.created||'')||1}else if(sy.snap[r.id]!==h)r._t=now}));
   if(sy.init)Object.keys(sy.snap).forEach(id=>{if(!(id in seen))st.del[id]=now});
   const sh=setHash();if(sy.init&&sy.setHash!==undefined&&sy.setHash!==sh)st.setT=now;
+  // each setting (every business field separately) remembers when it was last changed on this device
+  st.sts=st.sts||{};sy.sk=sy.sk||{};setKeys(st).forEach(k=>{const h=hs(JSON.stringify(getK(st,k)??null));if(sy.init&&sy.sk[k]!==undefined&&sy.sk[k]!==h)st.sts[k]=now;sy.sk[k]=h});
   sy.snap=seen;sy.setHash=sh;sy.init=1}
-function resnap(){const seen={};RECS.forEach(k=>st[k].forEach(r=>{if(r&&r.id)seen[r.id]=recHash(r)}));sy.snap=seen;sy.setHash=setHash();sy.init=1}
+function resnap(){const seen={};RECS.forEach(k=>st[k].forEach(r=>{if(r&&r.id)seen[r.id]=recHash(r)}));sy.snap=seen;sy.setHash=setHash();sy.sk={};setKeys(st).forEach(k=>sy.sk[k]=hs(JSON.stringify(getK(st,k)??null)));sy.init=1}
 function writeLocal(){try{st.v=7;localStorage.setItem(KEY,JSON.stringify(st))}catch(e){if(!saveWarned){saveWarned=true;toast('⚠️ Couldn’t save on this device.',4000)}}}
 const custom=o=>['biz','pk','tpl','rates'].some(k=>o&&o[k]&&JSON.stringify(o[k])!==JSON.stringify({biz:DEF_BIZ,pk:DEF_PK,tpl:DOCS.DEF_TPL,rates:DEF_RATES}[k]));
-function takeSettings(S){applyData({...S,trials:null,clients:null,docs:null},true);st.setT=S.setT||0}
+const SGRP=['pk','rates','costs','disc3','bonusOn','bonus','calc','t3','tpl','dcur'];
+const setKeys=(...os)=>{const f=new Set(Object.keys(DEF_BIZ));os.forEach(o=>Object.keys((o&&o.biz)||{}).forEach(k=>f.add(k)));return[...[...f].map(k=>'biz.'+k),...SGRP]};
+const getK=(o,k)=>k.startsWith('biz.')?((o&&o.biz)||{})[k.slice(4)]:(o||{})[k];
+const setK=(o,k,v)=>{if(k.startsWith('biz.')){o.biz=o.biz||{};o.biz[k.slice(4)]=v}else o[k]=v};
+const defK=k=>k.startsWith('biz.')?DEF_BIZ[k.slice(4)]:{pk:DEF_PK,rates:DEF_RATES,costs:DEF_COSTS,disc3:10,bonusOn:true,bonus:DEF_BONUS,calc:DEF_CALC,t3:false,tpl:DOCS.DEF_TPL,dcur:'PKR'}[k];
+const isDef=(k,v)=>v==null||v===''||JSON.stringify(v)===JSON.stringify(defK(k));
+function mergeSettings(S){const ls=st.sts=st.sts||{},ss=S.sts||{};
+  setKeys(st,S).forEach(k=>{const lv=getK(st,k),sv=getK(S,k);if(sv===undefined||JSON.stringify(lv)===JSON.stringify(sv))return;
+    if(k==='biz.invNext'||k==='biz.agrNext'){setK(st,k,Math.max(+lv||1,+sv||1));return}
+    const lt=+ls[k]||0,rt=+ss[k]||0;
+    const take=rt>lt||(rt===lt&&isDef(k,lv)&&!isDef(k,sv)); // newer change wins; if neither side knows, a filled-in value beats an empty/default one
+    if(take){setK(st,k,clone(sv));ls[k]=rt}});
+  applyData({...st,trials:null,clients:null,docs:null},true)}
+function takeSettings(S){applyData({...S,trials:null,clients:null,docs:null},true);st.setT=S.setT||0;st.sts={...(S.sts||{})}}
 function mergeIn(S){if(!S)return;const now=Date.now(),del={...(S.del||{})};Object.entries(st.del||{}).forEach(([id,t])=>del[id]=Math.max(+t||0,+del[id]||0));
   RECS.forEach(k=>{const m=new Map();(S[k]||[]).forEach(r=>r&&r.id&&m.set(r.id,r));(st[k]||[]).forEach(r=>{if(!r||!r.id)return;const o=m.get(r.id);if(!o||(+r._t||0)>=(+o._t||0))m.set(r.id,r)});
     st[k]=[...m.values()].filter(r=>!(del[r.id]&&del[r.id]>=(+r._t||0)))});
@@ -107,7 +122,7 @@ function mergeIn(S){if(!S)return;const now=Date.now(),del={...(S.del||{})};Objec
   const seen={};st.docs.slice().sort((a,b)=>(+b._t||0)-(+a._t||0)).forEach(d=>{const k=[d.type,String(d.no||'').toUpperCase(),d.date,Math.round((d.money?.total||0)*100),String(d.client?.biz||'').trim().toLowerCase()].join('|');
     if(d.no&&seen[k])del[d.id]=now;else seen[k]=1});
   RECS.forEach(k=>st[k]=st[k].filter(r=>!(del[r.id]&&del[r.id]>=(+r._t||0))));
-  const sT=+S.setT||0,lT=+st.setT||0;if(sT>lT||(sT===lT&&!custom(st)&&custom(S)))takeSettings(S);
+  mergeSettings(S);
   st.del=del;migrate();resnap()}
 function replaceWith(S){['trials','clients','docs'].forEach(k=>st[k]=Array.isArray(S[k])?S[k]:[]);takeSettings(S);st.del=S.del||{};migrate();resnap()}
 function setSync(s){cloud.state=s;const el=$('sync'),el2=$('sync2');const L={ok:'Synced',saving:'Saving…',offline:'Offline · saved here',off:'Cloud not set up',login:'Sign in again',err:'Sync problem',idle:'Connecting…'};
