@@ -322,3 +322,14 @@ main{padding:16px 16px calc(110px + var(--safe-b));max-width:1500px;margin:0 aut
 @media (max-width:520px){ #dPrev .tx,#dWord .tx{display:none} #dPrev,#dWord{flex:0 0 auto;padding-left:16px;padding-right:16px} #dSave{flex:1} }
 .upt{font-style:normal;font-size:10px;font-weight:800;background:#E8F7EE;color:#14A800;border-radius:99px;padding:2px 7px;margin-left:4px;vertical-align:1px}
 .rr.up .c-no b{color:#108A00}
+
+/* ---------- cloud sync status ---------- */
+.sync{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:rgba(255,255,255,.6);border-radius:99px;padding:6px 11px;font:700 12px/1 var(--sans,inherit);color:var(--muted);cursor:pointer;transition:background .3s,color .3s}
+.sync b{width:8px;height:8px;border-radius:50%;background:#B9AFA6;flex:none;transition:background .3s}
+.sync.ok b{background:#2E9E5B;box-shadow:0 0 0 3px rgba(46,158,91,.15)} .sync.ok{color:#22744A}
+.sync.saving b,.sync.idle b{background:#C99A2E;animation:pulse 1s infinite ease-in-out}
+.sync.offline b,.sync.err b{background:#C77A1F} .sync.off b,.sync.login b{background:var(--red)} .sync.off,.sync.login{color:var(--red)}
+@keyframes pulse{50%{opacity:.35;transform:scale(.8)}}
+.topbar .sync i{display:none} .topbar .sync{padding:9px;border-radius:12px}
+.side .foot .sync{width:100%;justify-content:center;margin-bottom:8px}
+.steps2{margin:8px 0 0;padding-left:18px;line-height:1.6;font-size:13.5px}

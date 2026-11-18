@@ -32,6 +32,7 @@ const I={
  trash:'<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>', down:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>', up:'<path d="M12 21V9M7 14l5-5 5 5M5 3h14"/>',
  wa:'<path d="M3 21l1.6-4.8A8.5 8.5 0 1 1 8 19.5z"/>', phone:'<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
  check:'<path d="M5 12l5 5L20 7"/>', link:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+ refresh:'<path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/>',
  bars:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
  out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>'
 };
@@ -72,9 +73,71 @@ function applyData(o,withSettings){
   if(o.calc&&o.calc.base)st.calc={...DEF_CALC,...o.calc};
 }
 let saveWarned=false;
-function save(){try{st.v=7;localStorage.setItem(KEY,JSON.stringify(st))}catch(e){if(!saveWarned){saveWarned=true;toast('⚠️ Could not save on this device. Download a backup in Settings.',5000)}}}
+function save(){_save()}
 function migrate(){st.docs.forEach(d=>{if(!d.kind)d.kind='package';if(!d.currency)d.currency='PKR';if(d.type==='invoice'&&!(+d.fx>0))d.fx=+st.biz.fx||280;if(d.type==='agreement'&&!['sent','signed'].includes(d.status))d.status='sent'})}
 load();migrate();
+/* ---------------- cloud sync (Vercel storage) ----------------
+   The cloud copy is the real one. This device keeps a cache so the app opens instantly and works offline. */
+const SYK='dx_sync_v1',RECS=['trials','clients','docs'],SETK=['pk','rates','costs','disc3','bonusOn','bonus','calc','t3','biz','tpl','dcur'];
+let sy=(()=>{try{return JSON.parse(localStorage.getItem(SYK))||{}}catch(e){return{}}})();
+sy.rev=+sy.rev||0;sy.snap=sy.snap||{};
+const cloud={on:null,state:'idle',busy:false,again:false,last:0,timer:0};
+const hs=s=>{let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return h};
+const recHash=r=>{const{_t,...x}=r;return hs(JSON.stringify(x))};
+const setHash=()=>hs(JSON.stringify(SETK.map(k=>st[k])));
+function persistSy(){try{localStorage.setItem(SYK,JSON.stringify(sy))}catch(e){}}
+function stamp(){const now=Date.now(),seen={};st.del=st.del||{};
+  RECS.forEach(k=>st[k].forEach(r=>{if(!r||!r.id)return;const h=recHash(r);seen[r.id]=h;
+    if(!sy.init){if(!r._t)r._t=Date.parse(r.updated||r.created||'')||1}else if(sy.snap[r.id]!==h)r._t=now}));
+  if(sy.init)Object.keys(sy.snap).forEach(id=>{if(!(id in seen))st.del[id]=now});
+  const sh=setHash();if(sy.init&&sy.setHash!==undefined&&sy.setHash!==sh)st.setT=now;
+  sy.snap=seen;sy.setHash=sh;sy.init=1}
+function resnap(){const seen={};RECS.forEach(k=>st[k].forEach(r=>{if(r&&r.id)seen[r.id]=recHash(r)}));sy.snap=seen;sy.setHash=setHash();sy.init=1}
+function writeLocal(){try{st.v=7;localStorage.setItem(KEY,JSON.stringify(st))}catch(e){if(!saveWarned){saveWarned=true;toast('⚠️ Couldn’t save on this device.',4000)}}}
+const custom=o=>['biz','pk','tpl','rates'].some(k=>o&&o[k]&&JSON.stringify(o[k])!==JSON.stringify({biz:DEF_BIZ,pk:DEF_PK,tpl:DOCS.DEF_TPL,rates:DEF_RATES}[k]));
+function takeSettings(S){applyData({...S,trials:null,clients:null,docs:null},true);st.setT=S.setT||0}
+function mergeIn(S){if(!S)return;const now=Date.now(),del={...(S.del||{})};Object.entries(st.del||{}).forEach(([id,t])=>del[id]=Math.max(+t||0,+del[id]||0));
+  RECS.forEach(k=>{const m=new Map();(S[k]||[]).forEach(r=>r&&r.id&&m.set(r.id,r));(st[k]||[]).forEach(r=>{if(!r||!r.id)return;const o=m.get(r.id);if(!o||(+r._t||0)>=(+o._t||0))m.set(r.id,r)});
+    st[k]=[...m.values()].filter(r=>!(del[r.id]&&del[r.id]>=(+r._t||0)))});
+  // same client saved on two devices under different ids -> keep one
+  const byName={};st.clients.slice().sort((a,b)=>String(a.created||'').localeCompare(String(b.created||''))).forEach(c=>{const n=String(c.biz||'').trim().toLowerCase();
+    if(!n)return;const keep=byName[n];if(!keep){byName[n]=c;return}
+    ['person','phone','email','addr','ntn','source'].forEach(f=>{if(!keep[f]&&c[f])keep[f]=c[f]});st.docs.forEach(d=>{if(d.clientId===c.id)d.clientId=keep.id});del[c.id]=now;keep._t=now});
+  // same invoice saved twice -> keep the newest edit
+  const seen={};st.docs.slice().sort((a,b)=>(+b._t||0)-(+a._t||0)).forEach(d=>{const k=[d.type,String(d.no||'').toUpperCase(),d.date,Math.round((d.money?.total||0)*100),String(d.client?.biz||'').trim().toLowerCase()].join('|');
+    if(d.no&&seen[k])del[d.id]=now;else seen[k]=1});
+  RECS.forEach(k=>st[k]=st[k].filter(r=>!(del[r.id]&&del[r.id]>=(+r._t||0))));
+  const sT=+S.setT||0,lT=+st.setT||0;if(sT>lT||(sT===lT&&!custom(st)&&custom(S)))takeSettings(S);
+  st.del=del;migrate();resnap()}
+function replaceWith(S){['trials','clients','docs'].forEach(k=>st[k]=Array.isArray(S[k])?S[k]:[]);takeSettings(S);st.del=S.del||{};migrate();resnap()}
+function setSync(s){cloud.state=s;const el=$('sync'),el2=$('sync2');const L={ok:'Synced',saving:'Saving…',offline:'Offline · saved here',off:'Cloud not set up',login:'Sign in again',err:'Sync problem',idle:'Connecting…'};
+  [el,el2].forEach(e=>{if(!e)return;e.className='sync '+s;e.title=L[s]||'';const t=e.querySelector('i');if(t)t.textContent=L[s]||''});
+  const acc=$('syncAcc');if(acc)acc.innerHTML=syncCard()}
+function quietRender(){if(document.querySelector('.ov'))return cloud.pendingRender=true;if(view==='settings'){if(setDirty())return;newDraft()}cloud.pendingRender=false;try{render();drawNav()}catch(e){}}
+async function cloudPull(force){if(cloud.busy)return;if(!force&&document.querySelector('.ov'))return;
+  try{const r=await fetch('/api/data'+(sy.rev&&!sy.dirty&&!force?'?since='+sy.rev:''),{cache:'no-store',credentials:'same-origin'});
+    if(r.status===503){cloud.on=false;setSync('off');return}if(r.status===401){cloud.on=false;setSync('login');return}if(!r.ok)throw 0;
+    const j=await r.json();cloud.on=true;cloud.last=Date.now();
+    if(j.same){if(sy.dirty)return cloudPush();return setSync('ok')}
+    if(!j.state){if(st.docs.length||st.clients.length||st.trials.length||custom(st)){sy.dirty=1;return cloudPush()}sy.rev=j.rev;persistSy();return setSync('ok')}
+    if(j.rev!==sy.rev||sy.dirty){if(sy.dirty||!sy.synced){mergeIn(j.state);sy.dirty=1}else replaceWith(j.state);sy.rev=j.rev;sy.synced=1;writeLocal();persistSy();quietRender()}
+    if(sy.dirty)return cloudPush();setSync('ok')}catch(e){setSync(navigator.onLine===false?'offline':'err')}}
+async function cloudPush(){if(cloud.on===false)return;if(cloud.busy){cloud.again=true;return}cloud.busy=true;setSync('saving');
+  try{const r=await fetch('/api/data',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({baseRev:sy.rev,state:st})});
+    if(r.status===409){const j=await r.json();mergeIn(j.state);sy.rev=j.rev;writeLocal();persistSy();cloud.busy=false;quietRender();return cloudPush()}
+    if(r.status===503){cloud.on=false;setSync('off');return}if(r.status===401){setSync('login');return}if(!r.ok)throw 0;
+    const j=await r.json();sy.rev=j.rev;sy.dirty=0;sy.synced=1;persistSy();cloud.last=Date.now();setSync('ok')}
+  catch(e){setSync(navigator.onLine===false?'offline':'err')}
+  finally{cloud.busy=false;if(cloud.again){cloud.again=false;cloudPush()}}}
+function syncCard(){const s=cloud.state;
+  if(s==='off')return `<p><b>Cloud sync isn’t switched on yet.</b> Right now your data is only on this device.</p><ol class="steps2"><li>Open <b>vercel.com</b> → your <b>daxator-packages</b> project → <b>Storage</b> tab.</li><li>Click <b>Create Database</b> → choose <b>Upstash for Redis</b> (free) → Continue → Create.</li><li>When it asks, <b>connect it to this project</b> (all environments).</li><li>Go to <b>Deployments</b> → latest → <b>⋯ → Redeploy</b>. Then open the app here again.</li></ol>`;
+  if(s==='login')return `<p><b>Sign in again to sync.</b> Your session ended.</p><a class="btn sm" href="/login/">Sign in</a>`;
+  const when=cloud.last?new Date(cloud.last).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';
+  return `<p><b>${s==='ok'?'✓ Everything is saved in your Vercel cloud.':s==='saving'?'Saving to the cloud…':s==='offline'?'You’re offline. Changes are kept here and upload when you’re back online.':s==='err'?'Couldn’t reach the cloud just now. It will retry.':'Connecting…'}</b>${when&&s==='ok'?' Last synced '+when+'.':''}</p>
+   <p class="muted" style="font-size:12.5px">Open the app on any phone or laptop, sign in, and you’ll see the same invoices, clients and settings.</p>
+   <div class="row" style="flex-wrap:wrap;gap:8px"><button class="btn sm" id="syNow">${ic('refresh')}Sync now</button><button class="btn sm ghost danger" id="syWipe">Remove data from this device</button></div>`}
+const _save=()=>{stamp();writeLocal();sy.dirty=1;persistSy();clearTimeout(cloud.timer);cloud.timer=setTimeout(cloudPush,600)};
+stamp();persistSy();
 
 /* ---------------- ui helpers ---------------- */
 let tt;function toast(m,ms=2300){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),ms)}
@@ -781,7 +844,7 @@ function vSettings(){
   const ACC=['#7A5A44','#151311','#1F3A5F','#2F6B45','#7A2E2E','#C2521D','#5B3F86'];
   return `<div class="ph"><div><h1>Settings</h1><p>Prices, business details and your document template. Tap <b>Save</b> when you’re done.</p></div>
     <div class="acts"><button class="btn" id="stDisc">Discard</button><button class="btn dark" id="stSave">${ic('check')}Save settings</button></div></div>
-  <div class="stabs">${[['s-biz','Business'],['s-pk','Packages'],['s-price','Pricing'],['s-doc','Documents'],['s-cost','My costs'],['s-data','Data'],['s-acc','Account']].map(([a,l])=>`<button class="chip" data-go="${a}">${l}</button>`).join('')}</div>
+  <div class="stabs">${[['s-biz','Business'],['s-pk','Packages'],['s-price','Pricing'],['s-doc','Documents'],['s-cost','My costs'],['s-data','Data'],['s-sync','Cloud'],['s-acc','Account']].map(([a,l])=>`<button class="chip" data-go="${a}">${l}</button>`).join('')}</div>
   <div class="sgrid">
   <section class="sc glass" id="s-biz"><h3>My business</h3><p class="muted">Shown on invoices, quotes and agreements.</p>
     <div class="g2">${f('biz.name','Business name')}${f('biz.owner','Owner name')}${f('biz.ntn','Your NTN number','text','placeholder="Shows on every invoice, quote and agreement"')}${f('biz.phone','Phone / WhatsApp','tel')}${f('biz.email','Email','email')}${f('biz.addr','Address')}</div>
@@ -832,12 +895,13 @@ function vSettings(){
   <section class="sc glass" id="s-cost"><h3>My costs</h3><p class="muted">Used for “Show my profit” in the calculator. Never shown to clients.</p>
     <div class="g2">${f('costs.editor','Editor per reel','number')}${f('costs.travel','Travel per shoot','number')}${f('costs.photo','Photo edit per photo','number')}${f('costs.film','Ad film edit','number')}</div></section>
 
-  <section class="sc glass" id="s-data"><h3>Data &amp; backup</h3><p class="muted">Your records are saved in this browser. Download a backup often, and use Restore to move them to another device.</p>
+  <section class="sc glass" id="s-data"><h3>Data &amp; backup</h3><p class="muted">Your records live in your Vercel cloud (see Cloud below). A backup file is an extra safety copy, and Restore / import adds records from a file.</p>
     <div class="row" style="flex-wrap:wrap;margin-top:10px"><button class="btn" id="bk">${ic('down')}Download backup</button><button class="btn" id="rs">${ic('up')}Restore / import</button>
       <button class="btn" id="csvT">Trials CSV</button><button class="btn" id="csvI">Invoices CSV</button><button class="btn" id="wImp">Import walk-ins</button></div>
     <input type="file" id="rsF" accept=".json,application/json" class="hidden"><input type="file" id="wF" accept=".json,application/json" class="hidden">
     <button class="btn sm ghost danger" id="pkReset" style="margin-top:12px">Reset packages &amp; prices to default</button></section>
 
+  <section class="sc glass" id="s-sync"><h3>Cloud sync</h3><div id="syncAcc">${syncCard()}</div></section>
   <section class="sc glass" id="s-acc"><h3>Account</h3><p class="muted">This app is locked with your password. To change it: Vercel → your project → Settings → Environment Variables → <b>APP_PASSWORD</b> → edit → then Redeploy.</p>
     <a class="btn" href="/api/logout" style="margin-top:10px">${ic('out')}Log out of this device</a></section>
   </div>`}
@@ -924,5 +988,17 @@ const h=location.hash.slice(1);if(VIEWS.some(v=>v[0]===h))view=h;
 addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(VIEWS.some(x=>x[0]===v)&&v!==view)go(v)});
 let lastWide=wide();addEventListener('resize',()=>{const w=wide();if(w!==lastWide){lastWide=w;if(view==='clients')render()}});
 drawNav();render();
-window.__dx={st,go,openDoc,openShare,openCalc,saveSettings,openPay,nextInv,openUpwork};
+// ---- cloud sync wiring ----
+setSync('idle');cloudPull();
+setInterval(()=>{if(document.hidden)return;if(cloud.pendingRender&&!document.querySelector('.ov'))quietRender();if(Date.now()-cloud.last>45000)cloudPull()},15000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-cloud.last>10000)cloudPull()});
+addEventListener('online',()=>{sy.dirty?cloudPush():cloudPull()});addEventListener('offline',()=>setSync('offline'));
+addEventListener('beforeunload',e=>{if(sy.dirty&&cloud.on){cloudPush()}});
+document.addEventListener('click',async e=>{
+  if(e.target.closest('#syNow')){toast('Syncing…');await cloudPull(true);if(cloud.state==='ok')toast('Synced ✓')}
+  if(e.target.closest('#syWipe')){if(cloud.state!=='ok'||sy.dirty){toast('Wait until it says Synced first');return}
+    if(await ask('Remove data from this device?','Your invoices stay safe in your Vercel cloud. This only clears the copy on this phone or computer and signs you out.',[{label:'Cancel',value:0},{label:'Remove & sign out',value:1,cls:'dark'}])){
+      try{localStorage.removeItem(KEY);localStorage.removeItem(SYK)}catch(er){}location.href='/api/logout'}}
+  if(e.target.closest('.sync')&&!e.target.closest('#syncAcc')){go('settings');setTimeout(()=>{const el=$('s-sync');el&&el.scrollIntoView({behavior:'smooth',block:'start'})},250)}});
+window.__dx={st,go,openDoc,openShare,openCalc,saveSettings,openPay,nextInv,openUpwork,cloud,sy,cloudPull,cloudPush,mergeIn};
 })();
