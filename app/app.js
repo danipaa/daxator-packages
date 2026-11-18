@@ -221,18 +221,59 @@ function renderPaper(host,html,paper){
   fit();const imgs=qa('img',pp);imgs.forEach(i=>i.complete||i.addEventListener('load',fit,{once:true}));
   if(host._ro)host._ro.disconnect();host._ro=new ResizeObserver(fit);host._ro.observe(host);
 }
-function printHTML(html,paper){$('pa').innerHTML=`<style>${DOCS.pageCss({paper})}</style>`+html;
-  const imgs=qa('img',$('pa'));Promise.all(imgs.map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r}))).then(()=>setTimeout(()=>window.print(),120))}
+function printHTML(html,paper){$('pa').innerHTML=`<style>${DOCS.pageCss({paper})}</style><div class="ppaper ${paper==='Letter'?'letter':''}">${html}</div>`;
+  const imgs=qa('img',$('pa'));Promise.all(imgs.map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r}))).then(()=>document.fonts.ready).then(()=>setTimeout(()=>window.print(),150))}
+/* ---------------- real PDF, drawn exactly like the preview ---------------- */
+const loadScript=src=>new Promise((ok,no)=>{if(document.querySelector(`script[src="${src}"]`)){return window.jspdf&&window.html2canvas?ok():setTimeout(ok,400)}const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=no;document.head.appendChild(s)});
+async function pdfLibs(){await Promise.all([loadScript('/assets/vendor/html2canvas-pro-2.5.0.min.js'),loadScript('/assets/vendor/jspdf-2.5.2.umd.min.js')]);
+  const h=window.html2canvas;return{h2c:typeof h==='function'?h:(h.default||h.html2canvas),JsPDF:window.jspdf.jsPDF}}
+// push anything that would be cut by a page edge onto the next page
+function paginate(pp,H,PT,PB){const top0=()=>pp.getBoundingClientRect().top;
+  const sel='.doc > *, .doc tr, .doc li, .doc p, .doc h2, .doc h3, .doc .box, .doc .sig, .doc .ft, .doc table.sum, .doc .cols2, .doc .stamp';
+  for(let guard=0;guard<400;guard++){let moved=false;const T=top0();
+    for(const el of pp.querySelectorAll(sel)){if(el.closest('.pgsp'))continue;const r=el.getBoundingClientRect(),t=r.top-T,b=r.bottom-T,h=r.height;if(!h||h>H-PT-PB)continue;
+      const p=Math.floor(t/H),limit=(p+1)*H-PB;let need=b>limit;
+      if(!need&&/^H[23]$/.test(el.tagName)&&b>limit-48)need=true; // keep headings with their text
+      if(!need)continue;const push=Math.ceil((p+1)*H+PT-t);
+      if(el.tagName==='TR'){const sp=document.createElement('tr');sp.className='pgsp';sp.innerHTML=`<td colspan="9" style="height:${push}px;padding:0;border:0;background:#fff"></td>`;el.parentNode.insertBefore(sp,el)}
+      else el.style.marginTop=((parseFloat(getComputedStyle(el).marginTop)||0)+push)+'px';
+      moved=true;break}
+    if(!moved)break}}
+async function makePDF(d){const {h2c,JsPDF}=await pdfLibs();if(document.fonts)await document.fonts.ready;
+  const letter=st.tpl.paper==='Letter',W=letter?816:794,H=letter?1056:1123,PT=56,PB=48;
+  const host=document.createElement('div');host.className='pdfhost';host.innerHTML=`<div class="paper pdfp ${letter?'letter':''}">${DOCS.html(d,docCtx())}</div>`;document.body.appendChild(host);
+  try{const pp=host.firstElementChild;
+    await Promise.all(qa('img',pp).map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r})));
+    paginate(pp,H,PT,PB);
+    const pages=Math.max(1,Math.ceil((pp.scrollHeight-2)/H));pp.style.height=pages*H+'px';
+    const scale=Math.min(3,Math.max(2,devicePixelRatio||2));
+    const canvas=await h2c(pp,{scale,backgroundColor:'#ffffff',useCORS:true,logging:false,width:W,height:pages*H,windowWidth:W,scrollX:0,scrollY:0});
+    const pdf=new JsPDF({unit:'pt',format:letter?'letter':'a4',compress:true}),pw=pdf.internal.pageSize.getWidth(),ph=pdf.internal.pageSize.getHeight(),sh=Math.round(H*scale);
+    pdf.setProperties({title:docName(d),author:st.biz.name||'Daxator Studios',creator:'Daxator Packages'});
+    for(let i=0;i<pages;i++){const c=document.createElement('canvas');c.width=canvas.width;c.height=sh;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,sh);
+      g.drawImage(canvas,0,i*sh,canvas.width,Math.min(sh,canvas.height-i*sh),0,0,canvas.width,Math.min(sh,canvas.height-i*sh));
+      if(i)pdf.addPage();pdf.addImage(c.toDataURL('image/jpeg',0.93),'JPEG',0,0,pw,ph,undefined,'FAST')}
+    return pdf.output('blob')}
+  finally{host.remove()}}
+const docName=d=>[(d.no||({quote:'Quotation',invoice:'Invoice',agreement:'Agreement'})[d.type]),(d.client&&d.client.biz)||'Client',st.biz.name||'Daxator Studios'].join(' - ').replace(/[\\/]+/g,'-').replace(/[:*?"<>|]+/g,'').trim();
+const canShareFiles=()=>{try{return !!(navigator.canShare&&navigator.canShare({files:[new File(['x'],'x.pdf',{type:'application/pdf'})]}))}catch(e){return false}};
+async function pdfAction(d,how,btn){const old=btn&&btn.innerHTML;if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span>Making PDF…'}
+  try{const blob=await makePDF(d),name=docName(d)+'.pdf';
+    if(how==='share'&&canShareFiles()){try{await navigator.share({files:[new File([blob],name,{type:'application/pdf'})],title:name})}catch(e){if(e&&e.name!=='AbortError')throw e}}
+    else{const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast('PDF downloaded ✓')}}
+  catch(e){console.error(e);toast('Couldn’t make the PDF. Try Print instead.',3500)}
+  finally{if(btn){btn.disabled=false;btn.innerHTML=old}}}
 function wordDownload(d,ctx){const nm=(d.no?d.no+'-':'')+d.type+'-'+(d.client.biz||'client').replace(/[^a-z0-9]+/gi,'-').toLowerCase();
   dl(today()+'-'+nm+'.doc','﻿'+DOCS.wordHtml(d,ctx),'application/msword');toast('Word file downloaded')}
 function previewDoc(d){
   const ctx=docCtx(),html=DOCS.html(d,ctx);
   const m=modal({title:(d.no?esc(d.no)+' · ':'')+({invoice:'Invoice',quote:'Quotation',agreement:'Agreement'})[d.type],size:'xl',
     body:`<div class="pvwrap" style="height:100%"></div>`,
-    foot:`<button class="btn" data-a="word">${ic('word')}Word</button><button class="btn dark" data-a="print">${ic('print')}Print / Save PDF</button>`});
+    foot:`<button class="btn pvs" data-a="word" aria-label="Word">${ic('word')}<span class="tx">Word</span></button><button class="btn pvs" data-a="print" aria-label="Print">${ic('print')}<span class="tx">Print</span></button>${canShareFiles()?`<button class="btn" data-a="share">${ic('share')}Share</button>`:''}<button class="btn dark" data-a="pdf">${ic('down')}Download PDF</button>`});
   m.body.style.padding='0';m.body.style.display='flex';m.body.style.background='rgba(233,220,205,.35)';
   const host=m.body.querySelector('.pvwrap');host.style.flex='1';renderPaper(host,html,st.tpl.paper);
-  m.foot.onclick=e=>{const a=e.target.closest('[data-a]');if(!a)return;if(a.dataset.a==='print')printHTML(html,st.tpl.paper);else wordDownload(d,ctx)};
+  m.foot.onclick=e=>{const a=e.target.closest('[data-a]');if(!a||a.disabled)return;const k=a.dataset.a;
+    if(k==='print')printHTML(html,st.tpl.paper);else if(k==='word')wordDownload(d,ctx);else pdfAction(d,k,a)};
 }
 
 /* ---------------- router ---------------- */
@@ -478,7 +519,7 @@ function cliDetail(c){const ds=st.docs.filter(d=>d.clientId===c.id);
     <div class="acts"><button class="btn sm" data-ue="${d.id}">${ic('edit')}Edit</button><button class="btn sm danger" data-dd="${d.id}">${ic('trash')}</button></div></div>`}return `<div class="dc"><div class="row"><b class="grow">${esc(d.no)} <span class="muted" style="font-weight:600;font-size:13px">${inv?(d.kind==='custom'?'Custom invoice':'Invoice'):'Agreement'}</span></b><span class="pill ${d.status}">${DSL[d.status]}</span></div>
     <div class="muted" style="font-size:13px;margin-top:4px">${esc(d.plan.name)}${d.plan.monthly?' Plan':''} · <b style="color:var(--ink)">${amt(d,T)}</b>${d.plan.monthly&&d.term===3?' (3 months)':''}${inv?` · ${isUSD(d)?'≈ '+rs(inPKR(d,T)):'≈ '+usd(inUSD(d,T))}`:''}</div>
     <div class="muted" style="font-size:12.5px;margin-top:2px">Created ${fLong(d.date)}${inv&&d.status==='paid'?' · Cleared '+fLong(d.paidOn||d.date):''}${inv&&d.advOn&&d.status!=='unpaid'?' · Advance '+fLong(d.advOn):''}</div>
-    <div class="acts"><button class="btn sm" data-dp="${d.id}">${ic('eye')}Preview</button><button class="btn sm" data-dpr="${d.id}">${ic('print')}Print</button><button class="btn sm" data-dw="${d.id}">${ic('word')}Word</button>
+    <div class="acts"><button class="btn sm" data-dp="${d.id}">${ic('eye')}Preview</button><button class="btn sm" data-dpr="${d.id}">${ic('down')}PDF</button><button class="btn sm" data-dw="${d.id}">${ic('word')}Word</button>
       <button class="btn sm" data-ds="${d.id}">${inv?'Payment':'Status'}</button><button class="btn sm" data-de="${d.id}">${ic('edit')}Edit</button><button class="btn sm danger" data-dd="${d.id}">${ic('trash')}</button></div></div>`}).join(''):'<div class="empty" style="padding:20px">No documents yet.</div>'}</div>`}
 function wClients(){
   qa('[data-cu]').forEach(el=>{const v=+el.dataset.cu;el.dataset.v=0;countUp(el,v,el.dataset.n?n=>String(Math.round(n)):rs,800)});
@@ -502,7 +543,7 @@ async function cliClick(e,m){const t=e.target,g=a=>{const el=t.closest('['+a+']'
       st.docs=st.docs.filter(d=>d.clientId!==v);st.clients=st.clients.filter(x=>x.id!==v);if(selCli===v)selCli=null;save();refreshClients();toast('Client deleted')}return}
   const doc=id=>st.docs.find(d=>d.id===id);
   if((v=g('data-dp'))){previewDoc(doc(v));return}
-  if((v=g('data-dpr'))){const d=doc(v);printHTML(DOCS.html(d,docCtx()),st.tpl.paper);return}
+  if((v=g('data-dpr'))){const d=doc(v);pdfAction(d,'pdf',e.target.closest('[data-dpr]'));return}
   if((v=g('data-dw'))){wordDownload(doc(v),docCtx());return}
   if((v=g('data-ds'))){openPay(doc(v));return}
   if((v=g('data-de'))){m&&m.close();openDoc({docId:v});return}
@@ -615,7 +656,7 @@ function openDoc(o={}){
     qa('[data-la]',b).forEach(el=>{const l=D.lines[+el.dataset.la];if(l)el.textContent=fm((+l.qty||0)*(+l.rate||0))});
     if(inv)noHint();
     m.setTitle((editing?'Edit ':'New ')+(c&&D.type==='invoice'?'custom invoice':c?'custom quotation':TL[D.type]));
-    $('dSave').innerHTML=D.type==='quote'?ic('print')+'Print / Save PDF':ic('check')+(editing?'Update & preview':'Save & preview');
+    $('dSave').innerHTML=D.type==='quote'?ic('eye')+'Preview & PDF':ic('check')+(editing?'Update & preview':'Save & preview');
     clearTimeout(lt);lt=setTimeout(()=>{if(getComputedStyle(b.querySelector('.live')).display!=='none'){const d=collect();d.client.biz=d.client.biz||'Client name';d.no=d.no||'—';renderPaper($('dLive'),DOCS.html(d,docCtx()),st.tpl.paper)}},120)}
   b.addEventListener('input',e=>{const t=e.target;if(t.id==='dPeriod')D.periodTouched=true;
     const li=t.closest('[data-li]');if(li&&t.dataset.lf){D.lines[+li.dataset.li][t.dataset.lf]=t.dataset.lf==='desc'?t.value:t.value}
@@ -652,7 +693,7 @@ function openDoc(o={}){
     if(editing){Object.assign(editing,d,{updated:new Date().toISOString()});d.id=editing.id}else{d.id=uid();d.created=new Date().toISOString();st.docs.unshift(d)}
     save();selCli=cid;refreshClients();return editing||d}
   $('dSave').onclick=()=>{const d=commit();if(!d)return;
-    if(D.type==='quote'){printHTML(DOCS.html(d,docCtx()),st.tpl.paper);return}
+    if(D.type==='quote'){previewDoc(d);return}
     m.close();toast((editing?'Updated ':'Saved ')+d.no+' ✓');setTimeout(()=>previewDoc(d),300)};
   $('dWord').onclick=()=>{const d=commit();if(!d)return;wordDownload(d,docCtx());if(D.type!=='quote'){m.close();toast('Saved '+d.no+' ✓')}};
   $('dPrev').onclick=()=>{const d=collect();d.client.biz=d.client.biz||'Client name';d.no=d.no||'—';previewDoc(d)};

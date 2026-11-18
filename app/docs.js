@@ -210,7 +210,7 @@ const BUILD={invoice,quote,agreement};
 window.DOCS={
   DEF_TPL, CSS,
   html:(d,ctx)=>BUILD[d.type](d,d.currency==='USD'?{...ctx,cur:'USD'}:ctx),
-  pageCss:t=>`@page{size:${(t&&t.paper)==='Letter'?'letter':'A4'};margin:12mm}`,
+  pageCss:t=>`@page{size:${(t&&t.paper)==='Letter'?'letter':'A4'};margin:56px 0 48px}`,
   wordHtml(d,ctx){
     const T={...DEF_TPL,...(ctx.tpl||{})};
     const css=CSS.replace(/var\(--acc\)/g,T.accent).replace(/color-mix\([^)]*\)/g,'#F4EEE8');

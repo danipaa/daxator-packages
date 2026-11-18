@@ -257,10 +257,19 @@ main{padding:16px 16px calc(110px + var(--safe-b));max-width:1500px;margin:0 aut
 /* print */
 #pa{display:none}
 @media print{
-  html,body{background:#fff!important}
-  .shell,.ov,.toast,.bgfx,.grain,.savebar{display:none!important}
+  html,body{background:#fff!important;margin:0!important;padding:0!important}
+  body>*:not(#pa){display:none!important}
+  .shell,.ov,.toast,.bgfx,.grain,.savebar,.pdfhost,.tabbar,#tabbar,.topbar{display:none!important}
   #pa{display:block}
+  #pa,#pa *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  #pa .ppaper{width:794px;padding:0 60px;box-sizing:border-box;margin:0 auto}
+  #pa .ppaper.letter{width:816px}
+  #pa .doc tr,#pa .doc li,#pa .doc p,#pa .doc .box,#pa .doc .sig,#pa .doc .ft,#pa .doc table.sum,#pa .doc .cols2,#pa .doc .dh{break-inside:avoid;page-break-inside:avoid}
+  #pa .doc h2,#pa .doc h3{break-after:avoid;page-break-after:avoid}
 }
+.pdfhost{position:fixed;left:-30000px;top:0;width:0;height:0;overflow:visible;pointer-events:none}
+.paper.pdfp{position:relative;transform:none!important;box-shadow:none;border-radius:0;box-sizing:border-box}
+@media (max-width:560px){ .md .mf .pvs .tx{display:none} .md .mf .pvs{flex:0 0 auto;padding-left:15px;padding-right:15px} }
 
 /* ---------- custom invoice editor ---------- */
 .seg button svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px;margin-right:6px}
