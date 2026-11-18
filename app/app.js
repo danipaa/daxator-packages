@@ -910,7 +910,8 @@ function mergeRecords(o){let n=0,dupe=0;const idMap={};
     const ex=st.clients.find(x=>String(x.biz||'').trim().toLowerCase()===String(c.biz||'').trim().toLowerCase());
     if(ex){idMap[c.id]=ex.id;['person','phone','email','addr','ntn','source'].forEach(k=>{if(!ex[k]&&c[k])ex[k]=c[k]})}else{st.clients.push(c);n++}});
   const dids=new Set(st.docs.map(d=>d.id));
-  (o.docs||[]).forEach(d=>{if(!d||!d.id)return;if(dids.has(d.id)){dupe++;return}if(idMap[d.clientId])d.clientId=idMap[d.clientId];st.docs.push(d);n++});
+  const same=(a,b)=>a.type===b.type&&String(a.no||'').toUpperCase()===String(b.no||'').toUpperCase()&&a.date===b.date&&Math.abs((a.money?.total||0)-(b.money?.total||0))<.01&&String(a.client?.biz||'').trim().toLowerCase()===String(b.client?.biz||'').trim().toLowerCase();
+  (o.docs||[]).forEach(d=>{if(!d||!d.id)return;if(dids.has(d.id)||st.docs.some(x=>same(x,d))){dupe++;return}if(idMap[d.clientId])d.clientId=idMap[d.clientId];st.docs.push(d);n++});
   // same number used twice: the older document keeps it, the newer one moves to the next free number
   const moved=[];
   ['invoice','agreement'].forEach(type=>{const by={};st.docs.filter(d=>d.type===type&&d.no).forEach(d=>{const k=String(d.no).trim().toUpperCase();(by[k]=by[k]||[]).push(d)});
